@@ -1,6 +1,7 @@
+```lua
 --==============================================================
---                         UltraGpt Hub v3
---                 Roblox Studio Test Panel
+--                         ULTRAGPT v5
+--                    Roblox Studio Test Hub
 --==============================================================
 
 local Players = game:GetService("Players")
@@ -8,9 +9,10 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
 
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --==============================================================
 -- CONFIG
@@ -20,285 +22,286 @@ local MENU_KEY = Enum.KeyCode.Insert
 
 local DEFAULT_WALK_SPEED = 16
 local DEFAULT_JUMP_POWER = 50
+local DEFAULT_GRAVITY = 196.2
+local DEFAULT_FOV = 70
 
 local FLY_SPEED = 60
-local BOOST_SPEED = 100
 
 --==============================================================
 -- COLORS
 --==============================================================
 
-local BG = Color3.fromRGB(15, 15, 21)
-local PANEL = Color3.fromRGB(20, 20, 28)
-local PANEL_2 = Color3.fromRGB(27, 27, 37)
-local BUTTON = Color3.fromRGB(31, 31, 42)
+local BG = Color3.fromRGB(14, 14, 20)
+local PANEL = Color3.fromRGB(19, 19, 27)
+local BUTTON = Color3.fromRGB(29, 29, 39)
 local BUTTON_HOVER = Color3.fromRGB(42, 42, 56)
+local ACCENT = Color3.fromRGB(125, 90, 255)
+local ACCENT_DARK = Color3.fromRGB(70, 48, 150)
 
 local TEXT = Color3.fromRGB(240, 240, 245)
 local SUBTEXT = Color3.fromRGB(145, 145, 160)
 
-local ACCENT = Color3.fromRGB(125, 90, 255)
-local ACCENT_DARK = Color3.fromRGB(70, 48, 150)
-
 local SUCCESS = Color3.fromRGB(80, 205, 125)
+local WARNING = Color3.fromRGB(235, 180, 80)
 local DANGER = Color3.fromRGB(225, 85, 95)
 
 --==============================================================
 -- CHARACTER
 --==============================================================
 
-local character
-local humanoid
-local rootPart
+local Character
+local Humanoid
+local RootPart
 
 local function updateCharacter()
-	character = player.Character or player.CharacterAdded:Wait()
-	humanoid = character:WaitForChild("Humanoid")
-	rootPart = character:WaitForChild("HumanoidRootPart")
+	Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	Humanoid = Character:WaitForChild("Humanoid")
+	RootPart = Character:WaitForChild("HumanoidRootPart")
 end
 
 updateCharacter()
 
 --==============================================================
--- STATES
+-- STATE
 --==============================================================
 
-local state = {
+local State = {
 	Fly = false,
 	NoClip = false,
 	Speed = false,
 	Boost = false,
 	InfiniteJump = false,
-
 	Spin = false,
 	AutoRotate = true,
 
 	FullBright = false,
+	NoShadows = false,
 	LowGravity = false,
+
+	Freeze = false,
+	Anchor = false,
 
 	HUD = true,
 	Crosshair = false,
-
-	WindowSize = "Normal"
+	ThirdPerson = false
 }
 
-local connections = {}
+local Connections = {}
 
-local savedPosition = nil
-local savedGravity = workspace.Gravity
-local savedLighting = {}
+local SavedPosition = nil
+local SelectedPlayer = nil
 
-local currentPage = "Character"
+local WalkSpeedValue = DEFAULT_WALK_SPEED
+local JumpPowerValue = DEFAULT_JUMP_POWER
+
+local MenuVisible = true
+local CurrentPage = "Character"
 
 --==============================================================
 -- UTILITY
 --==============================================================
 
 local function disconnect(name)
-	if connections[name] then
-		connections[name]:Disconnect()
-		connections[name] = nil
+	if Connections[name] then
+		Connections[name]:Disconnect()
+		Connections[name] = nil
 	end
 end
 
-local function tween(instance, properties, duration, style, direction)
+local function tween(object, properties, duration, style, direction)
 	local info = TweenInfo.new(
 		duration or 0.2,
 		style or Enum.EasingStyle.Quart,
 		direction or Enum.EasingDirection.Out
 	)
 
-	local t = TweenService:Create(instance, info, properties)
-	t:Play()
+	local animation = TweenService:Create(object, info, properties)
+	animation:Play()
 
-	return t
+	return animation
+end
+
+local function notify(message, duration)
+	if _G.UltraGptNotify then
+		_G.UltraGptNotify(message, duration)
+	end
 end
 
 --==============================================================
--- GUI ROOT
+-- GUI
 --==============================================================
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "UltraGptHub"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = player:WaitForChild("PlayerGui")
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "UltraGpt"
+GUI.ResetOnSpawn = false
+GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 --==============================================================
--- MAIN WINDOW
+-- MAIN
 --==============================================================
 
-local main = Instance.new("Frame")
-main.Name = "Main"
-main.Size = UDim2.new(0, 850, 0, 560)
-main.Position = UDim2.new(0.5, -425, 0.5, -280)
-main.BackgroundColor3 = BG
-main.BorderSizePixel = 0
-main.ClipsDescendants = true
-main.Parent = gui
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 920, 0, 600)
+Main.Position = UDim2.new(0.5, -460, 0.5, -300)
+Main.BackgroundColor3 = BG
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Main.Parent = GUI
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 18)
-mainCorner.Parent = main
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 18)
+MainCorner.Parent = Main
 
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(65, 65, 85)
-mainStroke.Transparency = 0.25
-mainStroke.Thickness = 1
-mainStroke.Parent = main
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(65, 65, 85)
+MainStroke.Transparency = 0.2
+MainStroke.Parent = Main
 
 --==============================================================
 -- TOP BAR
 --==============================================================
 
-local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(1, 0, 0, 65)
-topBar.BackgroundColor3 = PANEL
-topBar.BorderSizePixel = 0
-topBar.Parent = main
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 66)
+TopBar.BackgroundColor3 = PANEL
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
 
-local topCorner = Instance.new("UICorner")
-topCorner.CornerRadius = UDim.new(0, 18)
-topCorner.Parent = topBar
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 18)
+TopCorner.Parent = TopBar
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(0, 260, 0, 32)
-title.Position = UDim2.new(0, 22, 0, 9)
-title.BackgroundTransparency = 1
-title.Text = "UltraGpt"
-title.TextColor3 = TEXT
-title.TextSize = 24
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = topBar
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 300, 0, 34)
+Title.Position = UDim2.new(0, 22, 0, 8)
+Title.BackgroundTransparency = 1
+Title.Text = "UltraGpt"
+Title.TextColor3 = TEXT
+Title.TextSize = 25
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
 
-local subtitle = Instance.new("TextLabel")
-subtitle.Size = UDim2.new(0, 300, 0, 18)
-subtitle.Position = UDim2.new(0, 23, 0, 38)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "v3  •  Studio Test Hub"
-subtitle.TextColor3 = SUBTEXT
-subtitle.TextSize = 10
-subtitle.Font = Enum.Font.GothamMedium
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.Parent = topBar
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(0, 350, 0, 18)
+Subtitle.Position = UDim2.new(0, 23, 0, 41)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "v5  •  Studio Test Hub"
+Subtitle.TextColor3 = SUBTEXT
+Subtitle.TextSize = 10
+Subtitle.Font = Enum.Font.GothamMedium
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+Subtitle.Parent = TopBar
 
-local statusDot = Instance.new("Frame")
-statusDot.Size = UDim2.new(0, 8, 0, 8)
-statusDot.Position = UDim2.new(1, -155, 0, 26)
-statusDot.BackgroundColor3 = SUCCESS
-statusDot.BorderSizePixel = 0
-statusDot.Parent = topBar
+local Dot = Instance.new("Frame")
+Dot.Size = UDim2.new(0, 8, 0, 8)
+Dot.Position = UDim2.new(1, -155, 0, 25)
+Dot.BackgroundColor3 = SUCCESS
+Dot.BorderSizePixel = 0
+Dot.Parent = TopBar
 
-local statusDotCorner = Instance.new("UICorner")
-statusDotCorner.CornerRadius = UDim.new(1, 0)
-statusDotCorner.Parent = statusDot
+local DotCorner = Instance.new("UICorner")
+DotCorner.CornerRadius = UDim.new(1, 0)
+DotCorner.Parent = Dot
 
-local statusText = Instance.new("TextLabel")
-statusText.Size = UDim2.new(0, 115, 0, 25)
-statusText.Position = UDim2.new(1, -142, 0, 18)
-statusText.BackgroundTransparency = 1
-statusText.Text = "READY"
-statusText.TextColor3 = SUBTEXT
-statusText.TextSize = 10
-statusText.Font = Enum.Font.GothamBold
-statusText.TextXAlignment = Enum.TextXAlignment.Left
-statusText.Parent = topBar
+local Ready = Instance.new("TextLabel")
+Ready.Size = UDim2.new(0, 110, 0, 20)
+Ready.Position = UDim2.new(1, -142, 0, 18)
+Ready.BackgroundTransparency = 1
+Ready.Text = "READY"
+Ready.TextColor3 = SUBTEXT
+Ready.TextSize = 10
+Ready.Font = Enum.Font.GothamBold
+Ready.Parent = TopBar
 
 --==============================================================
 -- SIDEBAR
 --==============================================================
 
-local sidebar = Instance.new("Frame")
-sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 190, 1, -65)
-sidebar.Position = UDim2.new(0, 0, 0, 65)
-sidebar.BackgroundColor3 = PANEL
-sidebar.BorderSizePixel = 0
-sidebar.Parent = main
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 195, 1, -66)
+Sidebar.Position = UDim2.new(0, 0, 0, 66)
+Sidebar.BackgroundColor3 = PANEL
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = Main
 
-local sidebarPadding = Instance.new("UIPadding")
-sidebarPadding.PaddingTop = UDim.new(0, 15)
-sidebarPadding.PaddingLeft = UDim.new(0, 12)
-sidebarPadding.PaddingRight = UDim.new(0, 12)
-sidebarPadding.Parent = sidebar
+local SidebarPadding = Instance.new("UIPadding")
+SidebarPadding.PaddingTop = UDim.new(0, 14)
+SidebarPadding.PaddingLeft = UDim.new(0, 12)
+SidebarPadding.PaddingRight = UDim.new(0, 12)
+SidebarPadding.Parent = Sidebar
 
-local sidebarLayout = Instance.new("UIListLayout")
-sidebarLayout.Padding = UDim.new(0, 7)
-sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sidebarLayout.Parent = sidebar
+local SidebarLayout = Instance.new("UIListLayout")
+SidebarLayout.Padding = UDim.new(0, 7)
+SidebarLayout.Parent = Sidebar
 
 --==============================================================
 -- CONTENT
 --==============================================================
 
-local content = Instance.new("Frame")
-content.Name = "Content"
-content.Size = UDim2.new(1, -190, 1, -65)
-content.Position = UDim2.new(0, 190, 0, 65)
-content.BackgroundColor3 = BG
-content.BorderSizePixel = 0
-content.Parent = main
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -195, 1, -66)
+Content.Position = UDim2.new(0, 195, 0, 66)
+Content.BackgroundColor3 = BG
+Content.BorderSizePixel = 0
+Content.Parent = Main
 
-local pageTitle = Instance.new("TextLabel")
-pageTitle.Size = UDim2.new(1, -40, 0, 34)
-pageTitle.Position = UDim2.new(0, 22, 0, 18)
-pageTitle.BackgroundTransparency = 1
-pageTitle.Text = "Character"
-pageTitle.TextColor3 = TEXT
-pageTitle.TextSize = 21
-pageTitle.Font = Enum.Font.GothamBold
-pageTitle.TextXAlignment = Enum.TextXAlignment.Left
-pageTitle.Parent = content
+local PageTitle = Instance.new("TextLabel")
+PageTitle.Size = UDim2.new(1, -44, 0, 32)
+PageTitle.Position = UDim2.new(0, 22, 0, 16)
+PageTitle.BackgroundTransparency = 1
+PageTitle.Text = "Character"
+PageTitle.TextColor3 = TEXT
+PageTitle.TextSize = 21
+PageTitle.Font = Enum.Font.GothamBold
+PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+PageTitle.Parent = Content
 
-local pageSub = Instance.new("TextLabel")
-pageSub.Size = UDim2.new(1, -40, 0, 22)
-pageSub.Position = UDim2.new(0, 23, 0, 48)
-pageSub.BackgroundTransparency = 1
-pageSub.Text = "Movement and character testing"
-pageSub.TextColor3 = SUBTEXT
-pageSub.TextSize = 11
-pageSub.Font = Enum.Font.Gotham
-pageSub.TextXAlignment = Enum.TextXAlignment.Left
-pageSub.Parent = content
+local PageSubtitle = Instance.new("TextLabel")
+PageSubtitle.Size = UDim2.new(1, -44, 0, 20)
+PageSubtitle.Position = UDim2.new(0, 23, 0, 45)
+PageSubtitle.BackgroundTransparency = 1
+PageSubtitle.Text = "Movement and character testing"
+PageSubtitle.TextColor3 = SUBTEXT
+PageSubtitle.TextSize = 11
+PageSubtitle.Font = Enum.Font.Gotham
+PageSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+PageSubtitle.Parent = Content
 
-local pages = Instance.new("Frame")
-pages.Size = UDim2.new(1, -30, 1, -85)
-pages.Position = UDim2.new(0, 15, 0, 80)
-pages.BackgroundTransparency = 1
-pages.Parent = content
+local Pages = Instance.new("Frame")
+Pages.Size = UDim2.new(1, -30, 1, -80)
+Pages.Position = UDim2.new(0, 15, 0, 78)
+Pages.BackgroundTransparency = 1
+Pages.Parent = Content
 
---==============================================================
--- PAGE FACTORY
---==============================================================
-
-local pageFrames = {}
+local PageFrames = {}
 
 local function createPage(name)
-	local frame = Instance.new("ScrollingFrame")
-	frame.Name = name
-	frame.Size = UDim2.new(1, 0, 1, 0)
-	frame.BackgroundTransparency = 1
-	frame.BorderSizePixel = 0
-	frame.ScrollBarThickness = 4
-	frame.ScrollBarImageColor3 = ACCENT
-	frame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	frame.Visible = false
-	frame.Parent = pages
+	local page = Instance.new("ScrollingFrame")
+	page.Name = name
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.ScrollBarThickness = 4
+	page.ScrollBarImageColor3 = ACCENT
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.Visible = false
+	page.Parent = Pages
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 4)
+	padding.PaddingLeft = UDim.new(0, 4)
+	padding.PaddingRight = UDim.new(0, 8)
+	padding.PaddingBottom = UDim.new(0, 20)
+	padding.Parent = page
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 8)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = frame
-
-	local padding = Instance.new("UIPadding")
-	padding.PaddingBottom = UDim.new(0, 15)
-	padding.PaddingLeft = UDim.new(0, 5)
-	padding.PaddingRight = UDim.new(0, 8)
-	padding.Parent = frame
+	layout.Parent = page
 
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		frame.CanvasSize = UDim2.new(
+		page.CanvasSize = UDim2.new(
 			0,
 			0,
 			0,
@@ -306,36 +309,36 @@ local function createPage(name)
 		)
 	end)
 
-	pageFrames[name] = frame
+	PageFrames[name] = page
 
-	return frame
+	return page
 end
 
 --==============================================================
--- CATEGORY LABEL
+-- SECTIONS
 --==============================================================
 
 local function createSection(parent, text)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -5, 0, 25)
-	label.BackgroundTransparency = 1
-	label.Text = string.upper(text)
-	label.TextColor3 = ACCENT
-	label.TextSize = 10
-	label.Font = Enum.Font.GothamBold
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = parent
+	local section = Instance.new("TextLabel")
+	section.Size = UDim2.new(1, -5, 0, 23)
+	section.BackgroundTransparency = 1
+	section.Text = string.upper(text)
+	section.TextColor3 = ACCENT
+	section.TextSize = 10
+	section.Font = Enum.Font.GothamBold
+	section.TextXAlignment = Enum.TextXAlignment.Left
+	section.Parent = parent
 
-	return label
+	return section
 end
 
 --==============================================================
--- BUTTON
+-- TOGGLE BUTTON
 --==============================================================
 
-local function createButton(parent, text, description)
+local function createToggle(parent, titleText, description)
 	local holder = Instance.new("Frame")
-	holder.Size = UDim2.new(1, -5, 0, 54)
+	holder.Size = UDim2.new(1, -5, 0, 55)
 	holder.BackgroundTransparency = 1
 	holder.Parent = parent
 
@@ -352,15 +355,14 @@ local function createButton(parent, text, description)
 	corner.Parent = button
 
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(50, 50, 65)
-	stroke.Thickness = 1
+	stroke.Color = Color3.fromRGB(52, 52, 68)
 	stroke.Parent = button
 
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -90, 0, 22)
+	label.Size = UDim2.new(1, -100, 0, 21)
 	label.Position = UDim2.new(0, 15, 0, 6)
 	label.BackgroundTransparency = 1
-	label.Text = text
+	label.Text = titleText
 	label.TextColor3 = TEXT
 	label.TextSize = 12
 	label.Font = Enum.Font.GothamSemibold
@@ -368,8 +370,8 @@ local function createButton(parent, text, description)
 	label.Parent = button
 
 	local desc = Instance.new("TextLabel")
-	desc.Size = UDim2.new(1, -90, 0, 18)
-	desc.Position = UDim2.new(0, 15, 0, 28)
+	desc.Size = UDim2.new(1, -100, 0, 17)
+	desc.Position = UDim2.new(0, 15, 0, 29)
 	desc.BackgroundTransparency = 1
 	desc.Text = description or ""
 	desc.TextColor3 = SUBTEXT
@@ -379,8 +381,8 @@ local function createButton(parent, text, description)
 	desc.Parent = button
 
 	local indicator = Instance.new("TextLabel")
-	indicator.Size = UDim2.new(0, 65, 0, 22)
-	indicator.Position = UDim2.new(1, -75, 0.5, -11)
+	indicator.Size = UDim2.new(0, 70, 0, 22)
+	indicator.Position = UDim2.new(1, -80, 0.5, -11)
 	indicator.BackgroundTransparency = 1
 	indicator.Text = "OFF"
 	indicator.TextColor3 = SUBTEXT
@@ -407,23 +409,8 @@ local function createButton(parent, text, description)
 		end
 	end)
 
-	button.MouseButton1Down:Connect(function()
-		tween(button, {
-			Size = UDim2.new(0.98, 0, 0.94, 0)
-		}, 0.07)
-	end)
-
-	button.MouseButton1Up:Connect(function()
-		tween(button, {
-			Size = UDim2.new(1, 0, 1, 0)
-		}, 0.1)
-	end)
-
 	return {
-		Holder = holder,
 		Button = button,
-		Label = label,
-		Description = desc,
 		Indicator = indicator
 	}
 end
@@ -437,40 +424,116 @@ local function setToggle(object, enabled)
 
 		tween(object.Button, {
 			BackgroundColor3 = Color3.fromRGB(46, 39, 60)
-		}, 0.15)
+		}, 0.12)
 	else
 		object.Indicator.Text = "OFF"
 		object.Indicator.TextColor3 = SUBTEXT
 
 		tween(object.Button, {
 			BackgroundColor3 = BUTTON
-		}, 0.15)
+		}, 0.12)
 	end
 end
 
 --==============================================================
--- NOTIFICATIONS
+-- ACTION BUTTON
 --==============================================================
 
-local notificationHolder = Instance.new("Frame")
-notificationHolder.Size = UDim2.new(0, 330, 1, -20)
-notificationHolder.Position = UDim2.new(1, -350, 0, 10)
-notificationHolder.BackgroundTransparency = 1
-notificationHolder.Parent = gui
+local function createAction(parent, titleText, description)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, -5, 0, 55)
+	holder.BackgroundTransparency = 1
+	holder.Parent = parent
 
-local notificationLayout = Instance.new("UIListLayout")
-notificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-notificationLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-notificationLayout.Padding = UDim.new(0, 8)
-notificationLayout.Parent = notificationHolder
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundColor3 = BUTTON
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Parent = holder
 
-local function notify(message, duration)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(52, 52, 68)
+	stroke.Parent = button
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -100, 0, 21)
+	label.Position = UDim2.new(0, 15, 0, 6)
+	label.BackgroundTransparency = 1
+	label.Text = titleText
+	label.TextColor3 = TEXT
+	label.TextSize = 12
+	label.Font = Enum.Font.GothamSemibold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = button
+
+	local desc = Instance.new("TextLabel")
+	desc.Size = UDim2.new(1, -100, 0, 17)
+	desc.Position = UDim2.new(0, 15, 0, 29)
+	desc.BackgroundTransparency = 1
+	desc.Text = description or ""
+	desc.TextColor3 = SUBTEXT
+	desc.TextSize = 9
+	desc.Font = Enum.Font.Gotham
+	desc.TextXAlignment = Enum.TextXAlignment.Left
+	desc.Parent = button
+
+	local indicator = Instance.new("TextLabel")
+	indicator.Size = UDim2.new(0, 70, 0, 22)
+	indicator.Position = UDim2.new(1, -80, 0.5, -11)
+	indicator.BackgroundTransparency = 1
+	indicator.Text = "RUN"
+	indicator.TextColor3 = ACCENT
+	indicator.TextSize = 10
+	indicator.Font = Enum.Font.GothamBold
+	indicator.TextXAlignment = Enum.TextXAlignment.Right
+	indicator.Parent = button
+
+	button.MouseEnter:Connect(function()
+		tween(button, {
+			BackgroundColor3 = BUTTON_HOVER
+		}, 0.12)
+	end)
+
+	button.MouseLeave:Connect(function()
+		tween(button, {
+			BackgroundColor3 = BUTTON
+		}, 0.12)
+	end)
+
+	return {
+		Button = button
+	}
+end
+
+--==============================================================
+-- NOTIFICATION SYSTEM
+--==============================================================
+
+local NotificationHolder = Instance.new("Frame")
+NotificationHolder.Size = UDim2.new(0, 320, 1, -20)
+NotificationHolder.Position = UDim2.new(1, -340, 0, 10)
+NotificationHolder.BackgroundTransparency = 1
+NotificationHolder.Parent = GUI
+
+local NotificationLayout = Instance.new("UIListLayout")
+NotificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+NotificationLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+NotificationLayout.Padding = UDim.new(0, 8)
+NotificationLayout.Parent = NotificationHolder
+
+function _G.UltraGptNotify(message, duration)
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 0, 0, 48)
-	frame.BackgroundColor3 = PANEL_2
+	frame.Size = UDim2.new(0, 0, 0, 46)
+	frame.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 	frame.BorderSizePixel = 0
 	frame.ClipsDescendants = true
-	frame.Parent = notificationHolder
+	frame.Parent = NotificationHolder
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 11)
@@ -478,31 +541,40 @@ local function notify(message, duration)
 
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = ACCENT
-	stroke.Transparency = 0.35
+	stroke.Transparency = 0.3
 	stroke.Parent = frame
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -25, 1, 0)
-	label.Position = UDim2.new(0, 12, 0, 0)
-	label.BackgroundTransparency = 1
-	label.Text = message
-	label.TextColor3 = TEXT
-	label.TextSize = 11
-	label.Font = Enum.Font.GothamMedium
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = frame
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1, -20, 1, 0)
+	text.Position = UDim2.new(0, 10, 0, 0)
+	text.BackgroundTransparency = 1
+	text.Text = message
+	text.TextColor3 = TEXT
+	text.TextSize = 11
+	text.Font = Enum.Font.GothamMedium
+	text.TextXAlignment = Enum.TextXAlignment.Left
+	text.Parent = frame
 
-	tween(frame, {
-		Size = UDim2.new(0, 310, 0, 48)
-	}, 0.25)
+	tween(
+		frame,
+		{
+			Size = UDim2.new(0, 300, 0, 46)
+		},
+		0.22,
+		Enum.EasingStyle.Back
+	)
 
 	task.delay(duration or 2.5, function()
 		if frame.Parent then
-			local t = tween(frame, {
-				Size = UDim2.new(0, 0, 0, 48)
-			}, 0.2)
+			local out = tween(
+				frame,
+				{
+					Size = UDim2.new(0, 0, 0, 46)
+				},
+				0.18
+			)
 
-			t.Completed:Connect(function()
+			out.Completed:Connect(function()
 				frame:Destroy()
 			end)
 		end
@@ -513,58 +585,90 @@ end
 -- CHARACTER PAGE
 --==============================================================
 
-local characterPage = createPage("Character")
+local CharacterPage = createPage("Character")
 
-createSection(characterPage, "Movement")
+createSection(CharacterPage, "Movement")
 
-local fly = createButton(
-	characterPage,
+local Fly = createToggle(
+	CharacterPage,
 	"Fly",
 	"WASD + Space / Ctrl"
 )
 
-local noclip = createButton(
-	characterPage,
+local NoClip = createToggle(
+	CharacterPage,
 	"NoClip",
-	"Walk through solid parts"
+	"Disable character collisions"
 )
 
-local speed = createButton(
-	characterPage,
+local Speed = createToggle(
+	CharacterPage,
 	"Speed",
 	"WalkSpeed = 32"
 )
 
-local boost = createButton(
-	characterPage,
+local Boost = createToggle(
+	CharacterPage,
 	"Speed Boost",
 	"WalkSpeed = 100"
 )
 
-local infiniteJump = createButton(
-	characterPage,
+local InfiniteJump = createToggle(
+	CharacterPage,
 	"Infinite Jump",
 	"Jump continuously"
 )
 
-createSection(characterPage, "Character")
+createSection(CharacterPage, "Character")
 
-local sitButton = createButton(
-	characterPage,
+local AutoRotate = createToggle(
+	CharacterPage,
+	"Auto Rotate",
+	"Character rotation"
+)
+
+local Sit = createAction(
+	CharacterPage,
 	"Sit",
 	"Make your character sit"
 )
 
-local resetButton = createButton(
-	characterPage,
+local Reset = createAction(
+	CharacterPage,
 	"Reset Character",
-	"Respawn your character"
+	"Respawn character"
 )
 
-local rotate = createButton(
-	characterPage,
-	"Auto Rotate",
-	"Enable character rotation"
+local Kill = createAction(
+	CharacterPage,
+	"Reset Health",
+	"Set health to zero"
+)
+
+createSection(CharacterPage, "Values")
+
+local SpeedPlus = createAction(
+	CharacterPage,
+	"WalkSpeed +",
+	"Increase WalkSpeed by 4"
+)
+
+local SpeedMinus = createAction(
+	CharacterPage,
+	"WalkSpeed -",
+	"Decrease WalkSpeed by 4"
+)
+
+local JumpPlus = createAction(
+	CharacterPage,
+	"JumpPower +",
+	"Increase JumpPower by 10"
+)
+
+local JumpMinus = createAction(
+	CharacterPage,
+	"JumpPower -",
+	"Decrease JumpPower by 10"
 )
 
 --==============================================================
@@ -572,50 +676,50 @@ local rotate = createButton(
 --==============================================================
 
 local function stopFly()
-	state.Fly = false
+	State.Fly = false
 	disconnect("Fly")
 
-	if rootPart then
-		local velocity = rootPart:FindFirstChild("UltraGptVelocity")
+	if RootPart then
+		local velocity = RootPart:FindFirstChild("UltraGptVelocity")
 		if velocity then
 			velocity:Destroy()
 		end
 
-		local gyro = rootPart:FindFirstChild("UltraGptGyro")
+		local gyro = RootPart:FindFirstChild("UltraGptGyro")
 		if gyro then
 			gyro:Destroy()
 		end
 	end
 
-	if humanoid then
-		humanoid.AutoRotate = true
+	if Humanoid then
+		Humanoid.AutoRotate = State.AutoRotate
 	end
 
-	setToggle(fly, false)
+	setToggle(Fly, false)
 end
 
 local function startFly()
-	if not rootPart or not humanoid then
+	if not RootPart or not Humanoid then
 		return
 	end
 
-	state.Fly = true
-	humanoid.AutoRotate = false
+	State.Fly = true
+	Humanoid.AutoRotate = false
 
 	local velocity = Instance.new("BodyVelocity")
 	velocity.Name = "UltraGptVelocity"
 	velocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
 	velocity.Velocity = Vector3.zero
-	velocity.Parent = rootPart
+	velocity.Parent = RootPart
 
 	local gyro = Instance.new("BodyGyro")
 	gyro.Name = "UltraGptGyro"
 	gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
 	gyro.P = 12000
-	gyro.Parent = rootPart
+	gyro.Parent = RootPart
 
-	connections.Fly = RunService.RenderStepped:Connect(function()
-		if not state.Fly or not rootPart then
+	Connections.Fly = RunService.RenderStepped:Connect(function()
+		if not State.Fly or not RootPart then
 			return
 		end
 
@@ -653,21 +757,21 @@ local function startFly()
 		velocity.Velocity = direction
 
 		gyro.CFrame = CFrame.lookAt(
-			rootPart.Position,
-			rootPart.Position + cam.CFrame.LookVector
+			RootPart.Position,
+			RootPart.Position + cam.CFrame.LookVector
 		)
 	end)
 
-	setToggle(fly, true)
+	setToggle(Fly, true)
 end
 
-fly.Button.MouseButton1Click:Connect(function()
-	if state.Fly then
+Fly.Button.MouseButton1Click:Connect(function()
+	if State.Fly then
 		stopFly()
-		notify("Fly выключен")
+		notify("Fly OFF")
 	else
 		startFly()
-		notify("Fly включён")
+		notify("Fly ON")
 	end
 end)
 
@@ -676,45 +780,45 @@ end)
 --==============================================================
 
 local function stopNoClip()
-	state.NoClip = false
+	State.NoClip = false
 	disconnect("NoClip")
 
-	if character then
-		for _, object in ipairs(character:GetDescendants()) do
-			if object:IsA("BasePart") then
-				object.CanCollide = true
+	if Character then
+		for _, obj in ipairs(Character:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				obj.CanCollide = true
 			end
 		end
 	end
 
-	setToggle(noclip, false)
+	setToggle(NoClip, false)
 end
 
 local function startNoClip()
-	state.NoClip = true
+	State.NoClip = true
 
-	connections.NoClip = RunService.Stepped:Connect(function()
-		if not state.NoClip or not character then
+	Connections.NoClip = RunService.Stepped:Connect(function()
+		if not State.NoClip or not Character then
 			return
 		end
 
-		for _, object in ipairs(character:GetDescendants()) do
-			if object:IsA("BasePart") then
-				object.CanCollide = false
+		for _, obj in ipairs(Character:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				obj.CanCollide = false
 			end
 		end
 	end)
 
-	setToggle(noclip, true)
+	setToggle(NoClip, true)
 end
 
-noclip.Button.MouseButton1Click:Connect(function()
-	if state.NoClip then
+NoClip.Button.MouseButton1Click:Connect(function()
+	if State.NoClip then
 		stopNoClip()
-		notify("NoClip выключен")
+		notify("NoClip OFF")
 	else
 		startNoClip()
-		notify("NoClip включён")
+		notify("NoClip ON")
 	end
 end)
 
@@ -722,252 +826,310 @@ end)
 -- SPEED
 --==============================================================
 
-speed.Button.MouseButton1Click:Connect(function()
-	state.Speed = not state.Speed
+Speed.Button.MouseButton1Click:Connect(function()
+	State.Speed = not State.Speed
 
-	if humanoid then
-		humanoid.WalkSpeed =
-			state.Speed and 32 or DEFAULT_WALK_SPEED
+	if State.Speed then
+		State.Boost = false
+		WalkSpeedValue = 32
+		setToggle(Boost, false)
+	else
+		WalkSpeedValue = DEFAULT_WALK_SPEED
 	end
 
-	if state.Speed then
-		state.Boost = false
-		setToggle(boost, false)
+	if Humanoid and not State.Freeze then
+		Humanoid.WalkSpeed = WalkSpeedValue
 	end
 
-	setToggle(speed, state.Speed)
+	setToggle(Speed, State.Speed)
 end)
 
---==============================================================
--- BOOST
---==============================================================
+Boost.Button.MouseButton1Click:Connect(function()
+	State.Boost = not State.Boost
 
-boost.Button.MouseButton1Click:Connect(function()
-	state.Boost = not state.Boost
-
-	if humanoid then
-		if state.Boost then
-			humanoid.WalkSpeed = BOOST_SPEED
-		elseif state.Speed then
-			humanoid.WalkSpeed = 32
-		else
-			humanoid.WalkSpeed = DEFAULT_WALK_SPEED
-		end
+	if State.Boost then
+		State.Speed = false
+		WalkSpeedValue = BOOST_SPEED
+		setToggle(Speed, false)
+	else
+		WalkSpeedValue = DEFAULT_WALK_SPEED
 	end
 
-	if state.Boost then
-		state.Speed = false
-		setToggle(speed, false)
+	if Humanoid and not State.Freeze then
+		Humanoid.WalkSpeed = WalkSpeedValue
 	end
 
-	setToggle(boost, state.Boost)
+	setToggle(Boost, State.Boost)
 end)
 
 --==============================================================
 -- INFINITE JUMP
 --==============================================================
 
-infiniteJump.Button.MouseButton1Click:Connect(function()
-	state.InfiniteJump = not state.InfiniteJump
+InfiniteJump.Button.MouseButton1Click:Connect(function()
+	State.InfiniteJump = not State.InfiniteJump
 
 	disconnect("InfiniteJump")
 
-	if state.InfiniteJump then
-		connections.InfiniteJump =
+	if State.InfiniteJump then
+		Connections.InfiniteJump =
 			UserInputService.JumpRequest:Connect(function()
-				if humanoid then
-					humanoid:ChangeState(
+				if Humanoid then
+					Humanoid:ChangeState(
 						Enum.HumanoidStateType.Jumping
 					)
 				end
 			end)
 	end
 
-	setToggle(infiniteJump, state.InfiniteJump)
+	setToggle(InfiniteJump, State.InfiniteJump)
 end)
 
 --==============================================================
--- SIT / RESET / ROTATE
+-- AUTO ROTATE
 --==============================================================
 
-sitButton.Button.MouseButton1Click:Connect(function()
-	if humanoid then
-		humanoid.Sit = true
-		notify("Персонаж сел")
+AutoRotate.Button.MouseButton1Click:Connect(function()
+	State.AutoRotate = not State.AutoRotate
+
+	if Humanoid and not State.Fly then
+		Humanoid.AutoRotate = State.AutoRotate
+	end
+
+	setToggle(AutoRotate, State.AutoRotate)
+end)
+
+--==============================================================
+-- CHARACTER ACTIONS
+--==============================================================
+
+Sit.Button.MouseButton1Click:Connect(function()
+	if Humanoid then
+		Humanoid.Sit = true
+		notify("Character seated")
 	end
 end)
 
-resetButton.Button.MouseButton1Click:Connect(function()
-	if humanoid then
-		humanoid.Health = 0
+Reset.Button.MouseButton1Click:Connect(function()
+	if Humanoid then
+		Humanoid.Health = 0
 	end
 end)
 
-rotate.Button.MouseButton1Click:Connect(function()
-	state.AutoRotate = not state.AutoRotate
+Kill.Button.MouseButton1Click:Connect(function()
+	if Humanoid then
+		Humanoid.Health = 0
+		notify("Health reset")
+	end
+end)
 
-	if humanoid then
-		humanoid.AutoRotate = state.AutoRotate
+SpeedPlus.Button.MouseButton1Click:Connect(function()
+	WalkSpeedValue = math.clamp(
+		WalkSpeedValue + 4,
+		4,
+		150
+	)
+
+	if Humanoid and not State.Freeze then
+		Humanoid.WalkSpeed = WalkSpeedValue
 	end
 
-	setToggle(rotate, state.AutoRotate)
+	notify("WalkSpeed = " .. WalkSpeedValue)
+end)
+
+SpeedMinus.Button.MouseButton1Click:Connect(function()
+	WalkSpeedValue = math.clamp(
+		WalkSpeedValue - 4,
+		4,
+		150
+	)
+
+	if Humanoid and not State.Freeze then
+		Humanoid.WalkSpeed = WalkSpeedValue
+	end
+
+	notify("WalkSpeed = " .. WalkSpeedValue)
+end)
+
+JumpPlus.Button.MouseButton1Click:Connect(function()
+	JumpPowerValue = math.clamp(
+		JumpPowerValue + 10,
+		10,
+		200
+	)
+
+	if Humanoid then
+		Humanoid.JumpPower = JumpPowerValue
+	end
+
+	notify("JumpPower = " .. JumpPowerValue)
+end)
+
+JumpMinus.Button.MouseButton1Click:Connect(function()
+	JumpPowerValue = math.clamp(
+		JumpPowerValue - 10,
+		10,
+		200
+	)
+
+	if Humanoid then
+		Humanoid.JumpPower = JumpPowerValue
+	end
+
+	notify("JumpPower = " .. JumpPowerValue)
 end)
 
 --==============================================================
 -- TROLL PAGE
 --==============================================================
 
-local trollPage = createPage("Troll")
+local TrollPage = createPage("Troll")
 
-createSection(trollPage, "Effects")
+createSection(TrollPage, "Character Effects")
 
-local spin = createButton(
-	trollPage,
+local Spin = createToggle(
+	TrollPage,
 	"Spin Character",
-	"Rotate character continuously"
+	"Continuously rotate"
 )
 
-local fovFun = createButton(
-	trollPage,
+local Freeze = createToggle(
+	TrollPage,
+	"Freeze",
+	"Disable movement"
+)
+
+local Anchor = createToggle(
+	TrollPage,
+	"Anchor Character",
+	"Anchor HumanoidRootPart"
+)
+
+local WideFOV = createAction(
+	TrollPage,
 	"Wide FOV",
-	"Change camera field of view"
+	"Camera FOV = 110"
 )
 
-local headLook = createButton(
-	trollPage,
-	"Camera Shake",
-	"Funny local camera effect"
-)
-
-local jumpBounce = createButton(
-	trollPage,
-	"Bounce Effect",
-	"Small local character bounce"
-)
-
-createSection(trollPage, "Quick Actions")
-
-local flip = createButton(
-	trollPage,
-	"Flip",
-	"Rotate character 180°"
-)
-
-local tiny = createButton(
-	trollPage,
+local TinyFOV = createAction(
+	TrollPage,
 	"Tiny FOV",
-	"Make the camera zoomed"
+	"Camera FOV = 45"
+)
+
+local Flip = createAction(
+	TrollPage,
+	"Flip",
+	"Rotate 180 degrees"
+)
+
+local Bounce = createAction(
+	TrollPage,
+	"Bounce",
+	"Launch character upward"
 )
 
 --==============================================================
 -- SPIN
 --==============================================================
 
-spin.Button.MouseButton1Click:Connect(function()
-	state.Spin = not state.Spin
+Spin.Button.MouseButton1Click:Connect(function()
+	State.Spin = not State.Spin
 
 	disconnect("Spin")
 
-	if state.Spin then
-		connections.Spin =
+	if State.Spin then
+		Connections.Spin =
 			RunService.RenderStepped:Connect(function()
-				if rootPart then
-					rootPart.CFrame =
-						rootPart.CFrame *
-						CFrame.Angles(0, math.rad(8), 0)
+				if RootPart then
+					RootPart.CFrame =
+						RootPart.CFrame *
+						CFrame.Angles(
+							0,
+							math.rad(7),
+							0
+						)
 				end
 			end)
 	end
 
-	setToggle(spin, state.Spin)
+	setToggle(Spin, State.Spin)
 end)
 
 --==============================================================
--- FOV
+-- FREEZE
 --==============================================================
 
-fovFun.Button.MouseButton1Click:Connect(function()
-	local current = camera.FieldOfView
+Freeze.Button.MouseButton1Click:Connect(function()
+	State.Freeze = not State.Freeze
 
-	local target
-
-	if current < 80 then
-		target = 90
-	elseif current < 105 then
-		target = 120
-	else
-		target = 70
+	if Humanoid then
+		if State.Freeze then
+			Humanoid.WalkSpeed = 0
+			Humanoid.JumpPower = 0
+		else
+			Humanoid.WalkSpeed = WalkSpeedValue
+			Humanoid.JumpPower = JumpPowerValue
+		end
 	end
 
-	tween(camera, {
-		FieldOfView = target
-	}, 0.35)
-
-	notify("FOV: " .. target)
+	setToggle(Freeze, State.Freeze)
 end)
 
-tiny.Button.MouseButton1Click:Connect(function()
-	tween(camera, {
+--==============================================================
+-- ANCHOR
+--==============================================================
+
+Anchor.Button.MouseButton1Click:Connect(function()
+	State.Anchor = not State.Anchor
+
+	if RootPart then
+		RootPart.Anchored = State.Anchor
+	end
+
+	setToggle(Anchor, State.Anchor)
+end)
+
+--==============================================================
+-- TROLL ACTIONS
+--==============================================================
+
+WideFOV.Button.MouseButton1Click:Connect(function()
+	tween(Camera, {
+		FieldOfView = 110
+	}, 0.3)
+
+	notify("FOV = 110")
+end)
+
+TinyFOV.Button.MouseButton1Click:Connect(function()
+	tween(Camera, {
 		FieldOfView = 45
-	}, 0.35)
+	}, 0.3)
 
-	notify("Tiny FOV активирован")
+	notify("FOV = 45")
 end)
 
---==============================================================
--- CAMERA SHAKE
---==============================================================
-
-headLook.Button.MouseButton1Click:Connect(function()
-	local original = camera.CFrame
-
-	for i = 1, 10 do
-		camera.CFrame =
-			original *
+Flip.Button.MouseButton1Click:Connect(function()
+	if RootPart then
+		RootPart.CFrame =
+			RootPart.CFrame *
 			CFrame.Angles(
-				math.rad(math.random(-3, 3)),
-				math.rad(math.random(-3, 3)),
-				math.rad(math.random(-2, 2))
-			)
-
-		task.wait(0.035)
-	end
-
-	tween(camera, {
-		CFrame = original
-	}, 0.15)
-
-	notify("Camera Shake")
-end)
-
---==============================================================
--- BOUNCE
---==============================================================
-
-jumpBounce.Button.MouseButton1Click:Connect(function()
-	if rootPart then
-		rootPart.AssemblyLinearVelocity =
-			Vector3.new(
 				0,
-				65,
-				0
+				0,
+				math.rad(180)
 			)
 
-		notify("Bounce")
+		notify("FLIP")
 	end
 end)
 
---==============================================================
--- FLIP
---==============================================================
+Bounce.Button.MouseButton1Click:Connect(function()
+	if RootPart then
+		RootPart.AssemblyLinearVelocity =
+			Vector3.new(0, 70, 0)
 
-flip.Button.MouseButton1Click:Connect(function()
-	if rootPart then
-		rootPart.CFrame =
-			rootPart.CFrame *
-			CFrame.Angles(0, 0, math.rad(180))
-
-		notify("Flip!")
+		notify("BOUNCE")
 	end
 end)
 
@@ -975,119 +1137,129 @@ end)
 -- WORLD PAGE
 --==============================================================
 
-local worldPage = createPage("World")
+local WorldPage = createPage("World")
 
-createSection(worldPage, "Lighting")
+createSection(WorldPage, "Lighting")
 
-local fullBright = createButton(
-	worldPage,
+local FullBright = createToggle(
+	WorldPage,
 	"FullBright",
-	"Increase local lighting"
+	"Bright local lighting"
 )
 
-local noShadows = createButton(
-	worldPage,
+local NoShadows = createToggle(
+	WorldPage,
 	"No Shadows",
-	"Disable global shadows"
+	"Disable GlobalShadows"
 )
 
-local day = createButton(
-	worldPage,
+local Day = createAction(
+	WorldPage,
 	"Day",
-	"Set clock time to noon"
+	"ClockTime = 14"
 )
 
-local night = createButton(
-	worldPage,
+local Sunset = createAction(
+	WorldPage,
+	"Sunset",
+	"ClockTime = 18"
+)
+
+local Night = createAction(
+	WorldPage,
 	"Night",
-	"Set clock time to midnight"
+	"ClockTime = 0"
 )
 
-createSection(worldPage, "Physics")
+createSection(WorldPage, "Physics")
 
-local lowGravity = createButton(
-	worldPage,
+local LowGravity = createToggle(
+	WorldPage,
 	"Low Gravity",
-	"Reduce workspace gravity"
+	"Gravity = 60"
 )
 
-local normalGravity = createButton(
-	worldPage,
+local NormalGravity = createAction(
+	WorldPage,
 	"Normal Gravity",
 	"Restore default gravity"
 )
 
---==============================================================
--- FULLBRIGHT
---==============================================================
+FullBright.Button.MouseButton1Click:Connect(function()
+	State.FullBright = not State.FullBright
 
-fullBright.Button.MouseButton1Click:Connect(function()
-	state.FullBright = not state.FullBright
-
-	if state.FullBright then
-		savedLighting.Brightness = Lighting.Brightness
-		savedLighting.ClockTime = Lighting.ClockTime
-		savedLighting.FogEnd = Lighting.FogEnd
-		savedLighting.GlobalShadows = Lighting.GlobalShadows
-
+	if State.FullBright then
 		Lighting.Brightness = 3
-		Lighting.ClockTime = 14
 		Lighting.FogEnd = 100000
 		Lighting.GlobalShadows = false
 	else
-		for property, value in pairs(savedLighting) do
-			Lighting[property] = value
-		end
+		Lighting.Brightness = 1
+		Lighting.FogEnd = 100000
+		Lighting.GlobalShadows = true
 	end
 
-	setToggle(fullBright, state.FullBright)
+	setToggle(FullBright, State.FullBright)
 end)
 
-noShadows.Button.MouseButton1Click:Connect(function()
-	Lighting.GlobalShadows = not Lighting.GlobalShadows
+NoShadows.Button.MouseButton1Click:Connect(function()
+	State.NoShadows = not State.NoShadows
+
+	Lighting.GlobalShadows = not State.NoShadows
+
+	setToggle(NoShadows, State.NoShadows)
+end)
+
+Day.Button.MouseButton1Click:Connect(function()
+	tween(
+		Lighting,
+		{ClockTime = 14},
+		0.6
+	)
+
+	notify("DAY")
+end)
+
+Sunset.Button.MouseButton1Click:Connect(function()
+	tween(
+		Lighting,
+		{ClockTime = 18},
+		0.6
+	)
+
+	notify("SUNSET")
+end)
+
+Night.Button.MouseButton1Click:Connect(function()
+	tween(
+		Lighting,
+		{ClockTime = 0},
+		0.6
+	)
+
+	notify("NIGHT")
+end)
+
+LowGravity.Button.MouseButton1Click:Connect(function()
+	State.LowGravity = not State.LowGravity
+
+	workspace.Gravity =
+		State.LowGravity
+		and 60
+		or DEFAULT_GRAVITY
+
+	setToggle(LowGravity, State.LowGravity)
 
 	notify(
-		"GlobalShadows: " ..
-		tostring(Lighting.GlobalShadows)
+		"Gravity = " ..
+		math.floor(workspace.Gravity)
 	)
 end)
 
-day.Button.MouseButton1Click:Connect(function()
-	TweenService:Create(
-		Lighting,
-		TweenInfo.new(0.8),
-		{ClockTime = 14}
-	):Play()
+NormalGravity.Button.MouseButton1Click:Connect(function()
+	State.LowGravity = false
+	workspace.Gravity = DEFAULT_GRAVITY
 
-	notify("Day")
-end)
-
-night.Button.MouseButton1Click:Connect(function()
-	TweenService:Create(
-		Lighting,
-		TweenInfo.new(0.8),
-		{ClockTime = 0}
-	):Play()
-
-	notify("Night")
-end)
-
---==============================================================
--- GRAVITY
---==============================================================
-
-lowGravity.Button.MouseButton1Click:Connect(function()
-	workspace.Gravity = 60
-	state.LowGravity = true
-	setToggle(lowGravity, true)
-
-	notify("Low Gravity: 60")
-end)
-
-normalGravity.Button.MouseButton1Click:Connect(function()
-	workspace.Gravity = savedGravity
-	state.LowGravity = false
-	setToggle(lowGravity, false)
+	setToggle(LowGravity, false)
 
 	notify("Gravity restored")
 end)
@@ -1096,345 +1268,743 @@ end)
 -- TELEPORT PAGE
 --==============================================================
 
-local teleportPage = createPage("Teleport")
+local TeleportPage = createPage("Teleport")
 
-createSection(teleportPage, "Positions")
+createSection(TeleportPage, "Saved Position")
 
-local teleportSpawn = createButton(
-	teleportPage,
-	"Teleport to Spawn",
-	"Teleport to the nearest SpawnLocation"
-)
-
-local savePosition = createButton(
-	teleportPage,
+local SavePosition = createAction(
+	TeleportPage,
 	"Save Position",
-	"Save your current position"
+	"Save your current CFrame"
 )
 
-local returnPosition = createButton(
-	teleportPage,
+local ReturnPosition = createAction(
+	TeleportPage,
 	"Return Position",
 	"Return to saved position"
 )
 
-local teleportUp = createButton(
-	teleportPage,
+local TeleportSpawn = createAction(
+	TeleportPage,
+	"Teleport to Spawn",
+	"Find a SpawnLocation"
+)
+
+local TeleportUp = createAction(
+	TeleportPage,
 	"Teleport Up",
-	"Move 30 studs upward"
+	"+30 studs"
 )
 
-local teleportDown = createButton(
-	teleportPage,
+local TeleportDown = createAction(
+	TeleportPage,
 	"Teleport Down",
-	"Move 30 studs downward"
+	"-30 studs"
 )
 
+createSection(TeleportPage, "Selected Player")
+
+local PlayerTarget = Instance.new("TextLabel")
+PlayerTarget.Size = UDim2.new(1, -5, 0, 35)
+PlayerTarget.BackgroundColor3 = BUTTON
+PlayerTarget.BorderSizePixel = 0
+PlayerTarget.Text = "Target: nobody"
+PlayerTarget.TextColor3 = SUBTEXT
+PlayerTarget.TextSize = 11
+PlayerTarget.Font = Enum.Font.GothamMedium
+PlayerTarget.TextXAlignment = Enum.TextXAlignment.Left
+PlayerTarget.Parent = TeleportPage
+
+local PlayerTargetCorner = Instance.new("UICorner")
+PlayerTargetCorner.CornerRadius = UDim.new(0, 9)
+PlayerTargetCorner.Parent = PlayerTarget
+
+local TargetPadding = Instance.new("UIPadding")
+TargetPadding.PaddingLeft = UDim.new(0, 14)
+TargetPadding.Parent = PlayerTarget
+
+local TeleportToPlayer = createAction(
+	TeleportPage,
+	"Teleport To Player",
+	"Teleport to selected player"
+)
+
+local RefreshPlayers = createAction(
+	TeleportPage,
+	"Refresh Player List",
+	"Update available players"
+)
+
+createSection(TeleportPage, "Player List")
+
+local PlayerList = Instance.new("ScrollingFrame")
+PlayerList.Size = UDim2.new(1, -5, 0, 180)
+PlayerList.BackgroundColor3 = PANEL
+PlayerList.BorderSizePixel = 0
+PlayerList.ScrollBarThickness = 4
+PlayerList.ScrollBarImageColor3 = ACCENT
+PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayerList.Parent = TeleportPage
+
+local PlayerListCorner = Instance.new("UICorner")
+PlayerListCorner.CornerRadius = UDim.new(0, 10)
+PlayerListCorner.Parent = PlayerList
+
+local PlayerListPadding = Instance.new("UIPadding")
+PlayerListPadding.PaddingTop = UDim.new(0, 8)
+PlayerListPadding.PaddingLeft = UDim.new(0, 8)
+PlayerListPadding.PaddingRight = UDim.new(0, 8)
+PlayerListPadding.PaddingBottom = UDim.new(0, 8)
+PlayerListPadding.Parent = PlayerList
+
+local PlayerListLayout = Instance.new("UIListLayout")
+PlayerListLayout.Padding = UDim.new(0, 6)
+PlayerListLayout.Parent = PlayerList
+
+PlayerListLayout:GetPropertyChangedSignal(
+	"AbsoluteContentSize"
+):Connect(function()
+	PlayerList.CanvasSize = UDim2.new(
+		0,
+		0,
+		0,
+		PlayerListLayout.AbsoluteContentSize.Y + 16
+	)
+end)
+
 --==============================================================
--- TELEPORT FUNCTIONS
+-- PLAYER BUTTON
 --==============================================================
 
-teleportSpawn.Button.MouseButton1Click:Connect(function()
-	if not rootPart then
+local function createPlayerButton(targetPlayer)
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 0, 42)
+	button.BackgroundColor3 = BUTTON
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Parent = PlayerList
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = button
+
+	local displayName = Instance.new("TextLabel")
+	displayName.Size = UDim2.new(1, -100, 0, 19)
+	displayName.Position = UDim2.new(0, 12, 0, 4)
+	displayName.BackgroundTransparency = 1
+	displayName.Text = targetPlayer.DisplayName
+	displayName.TextColor3 = TEXT
+	displayName.TextSize = 11
+	displayName.Font = Enum.Font.GothamSemibold
+	displayName.TextXAlignment = Enum.TextXAlignment.Left
+	displayName.Parent = button
+
+	local username = Instance.new("TextLabel")
+	username.Size = UDim2.new(1, -100, 0, 15)
+	username.Position = UDim2.new(0, 12, 0, 23)
+	username.BackgroundTransparency = 1
+	username.Text = "@" .. targetPlayer.Name
+	username.TextColor3 = SUBTEXT
+	username.TextSize = 9
+	username.Font = Enum.Font.Gotham
+	username.TextXAlignment = Enum.TextXAlignment.Left
+	username.Parent = button
+
+	local target = Instance.new("TextLabel")
+	target.Size = UDim2.new(0, 65, 1, 0)
+	target.Position = UDim2.new(1, -75, 0, 0)
+	target.BackgroundTransparency = 1
+	target.Text = "SELECT"
+	target.TextColor3 = ACCENT
+	target.TextSize = 9
+	target.Font = Enum.Font.GothamBold
+	target.TextXAlignment = Enum.TextXAlignment.Right
+	target.Parent = button
+
+	if targetPlayer == LocalPlayer then
+		target.Text = "YOU"
+		target.TextColor3 = WARNING
+	end
+
+	button.MouseEnter:Connect(function()
+		tween(button, {
+			BackgroundColor3 = BUTTON_HOVER
+		}, 0.12)
+	end)
+
+	button.MouseLeave:Connect(function()
+		if SelectedPlayer == targetPlayer then
+			tween(button, {
+				BackgroundColor3 = Color3.fromRGB(46, 39, 60)
+			}, 0.12)
+		else
+			tween(button, {
+				BackgroundColor3 = BUTTON
+			}, 0.12)
+		end
+	end)
+
+	button.MouseButton1Click:Connect(function()
+
+		SelectedPlayer = targetPlayer
+
+		PlayerTarget.Text =
+			"Target: " ..
+			targetPlayer.DisplayName ..
+			"  (@" ..
+			targetPlayer.Name ..
+			")"
+
+		notify(
+			"Selected: " ..
+			targetPlayer.DisplayName
+		)
+
+		for _, child in ipairs(PlayerList:GetChildren()) do
+			if child:IsA("TextButton") then
+				if child == button then
+					child.BackgroundColor3 =
+						Color3.fromRGB(46, 39, 60)
+				else
+					child.BackgroundColor3 = BUTTON
+				end
+			end
+		end
+	end)
+
+	return button
+end
+
+local function refreshPlayerList()
+
+	for _, child in ipairs(PlayerList:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+
+	local allPlayers = Players:GetPlayers()
+
+	table.sort(
+		allPlayers,
+		function(a, b)
+			return a.Name:lower() < b.Name:lower()
+		end
+	)
+
+	for _, targetPlayer in ipairs(allPlayers) do
+		createPlayerButton(targetPlayer)
+	end
+
+	notify(
+		"Players: " ..
+		#allPlayers
+	)
+end
+
+refreshPlayerList()
+
+--==============================================================
+-- PLAYER TELEPORT
+--==============================================================
+
+TeleportToPlayer.Button.MouseButton1Click:Connect(function()
+
+	if not SelectedPlayer then
+		notify("Select a player first")
 		return
 	end
 
-	local spawnLocation =
+	if not SelectedPlayer.Parent then
+		notify("Player left the game")
+		SelectedPlayer = nil
+		PlayerTarget.Text = "Target: nobody"
+		refreshPlayerList()
+		return
+	end
+
+	local targetCharacter =
+		SelectedPlayer.Character
+
+	local targetRoot =
+		targetCharacter
+		and targetCharacter:FindFirstChild(
+			"HumanoidRootPart"
+		)
+
+	if not targetRoot then
+		notify("Target character not loaded")
+		return
+	end
+
+	if RootPart then
+		RootPart.CFrame =
+			targetRoot.CFrame *
+			CFrame.new(0, 3, 0)
+
+		notify(
+			"Teleported to " ..
+			SelectedPlayer.DisplayName
+		)
+	end
+end)
+
+RefreshPlayers.Button.MouseButton1Click:Connect(
+	refreshPlayerList
+)
+
+Players.PlayerAdded:Connect(function()
+	task.wait(0.25)
+	refreshPlayerList()
+end)
+
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+
+	if SelectedPlayer == leavingPlayer then
+		SelectedPlayer = nil
+		PlayerTarget.Text = "Target: nobody"
+	end
+
+	task.wait(0.1)
+	refreshPlayerList()
+end)
+
+--==============================================================
+-- POSITION TELEPORT
+--==============================================================
+
+SavePosition.Button.MouseButton1Click:Connect(function()
+	if RootPart then
+		SavedPosition = RootPart.CFrame
+		notify("Position saved")
+	end
+end)
+
+ReturnPosition.Button.MouseButton1Click:Connect(function()
+
+	if RootPart and SavedPosition then
+		RootPart.CFrame = SavedPosition
+		notify("Position restored")
+	else
+		notify("No saved position")
+	end
+
+end)
+
+TeleportSpawn.Button.MouseButton1Click:Connect(function()
+
+	local spawn =
 		workspace:FindFirstChildWhichIsA(
 			"SpawnLocation",
 			true
 		)
 
-	if spawnLocation then
-		rootPart.CFrame =
-			spawnLocation.CFrame *
+	if spawn and RootPart then
+		RootPart.CFrame =
+			spawn.CFrame *
 			CFrame.new(0, 5, 0)
 
 		notify("Teleported to Spawn")
 	else
-		notify("SpawnLocation не найден")
+		notify("SpawnLocation not found")
 	end
+
 end)
 
-savePosition.Button.MouseButton1Click:Connect(function()
-	if rootPart then
-		savedPosition = rootPart.CFrame
-		notify("Позиция сохранена")
-	end
-end)
+TeleportUp.Button.MouseButton1Click:Connect(function()
 
-returnPosition.Button.MouseButton1Click:Connect(function()
-	if rootPart and savedPosition then
-		rootPart.CFrame = savedPosition
-		notify("Позиция восстановлена")
-	else
-		notify("Сначала сохрани позицию")
-	end
-end)
-
-teleportUp.Button.MouseButton1Click:Connect(function()
-	if rootPart then
-		rootPart.CFrame =
-			rootPart.CFrame *
+	if RootPart then
+		RootPart.CFrame =
+			RootPart.CFrame *
 			CFrame.new(0, 30, 0)
 	end
+
 end)
 
-teleportDown.Button.MouseButton1Click:Connect(function()
-	if rootPart then
-		rootPart.CFrame =
-			rootPart.CFrame *
+TeleportDown.Button.MouseButton1Click:Connect(function()
+
+	if RootPart then
+		RootPart.CFrame =
+			RootPart.CFrame *
 			CFrame.new(0, -30, 0)
 	end
+
 end)
 
 --==============================================================
 -- VISUAL PAGE
 --==============================================================
 
-local visualPage = createPage("Visual")
+local VisualPage = createPage("Visual")
 
-createSection(visualPage, "HUD")
+createSection(VisualPage, "HUD")
 
-local hudToggle = createButton(
-	visualPage,
+local HUDToggle = createToggle(
+	VisualPage,
 	"HUD",
-	"FPS + coordinates"
+	"FPS + XYZ coordinates"
 )
 
-local crosshair = createButton(
-	visualPage,
+local Crosshair = createToggle(
+	VisualPage,
 	"Crosshair",
 	"Center screen crosshair"
 )
 
-local resetFOV = createButton(
-	visualPage,
-	"Reset FOV",
-	"Restore camera FOV to 70"
+local ThirdPerson = createToggle(
+	VisualPage,
+	"Third Person",
+	"Camera distance test"
 )
 
-createSection(visualPage, "Camera")
+createSection(VisualPage, "Camera")
 
-local fovPlus = createButton(
-	visualPage,
+local FOVPlus = createAction(
+	VisualPage,
 	"FOV +",
-	"Increase field of view"
+	"Increase FOV by 10"
 )
 
-local fovMinus = createButton(
-	visualPage,
+local FOVMinus = createAction(
+	VisualPage,
 	"FOV -",
-	"Decrease field of view"
+	"Decrease FOV by 10"
+)
+
+local ResetFOV = createAction(
+	VisualPage,
+	"Reset FOV",
+	"Restore FOV to 70"
 )
 
 --==============================================================
 -- HUD
 --==============================================================
 
-local hud = Instance.new("Frame")
-hud.Size = UDim2.new(0, 230, 0, 70)
-hud.Position = UDim2.new(1, -250, 1, -90)
-hud.BackgroundColor3 = PANEL
-hud.BackgroundTransparency = 0.08
-hud.BorderSizePixel = 0
-hud.Parent = gui
+local HUD = Instance.new("Frame")
+HUD.Size = UDim2.new(0, 235, 0, 72)
+HUD.Position = UDim2.new(1, -255, 1, -92)
+HUD.BackgroundColor3 = PANEL
+HUD.BackgroundTransparency = 0.08
+HUD.BorderSizePixel = 0
+HUD.Parent = GUI
 
-local hudCorner = Instance.new("UICorner")
-hudCorner.CornerRadius = UDim.new(0, 12)
-hudCorner.Parent = hud
+local HUDCorner = Instance.new("UICorner")
+HUDCorner.CornerRadius = UDim.new(0, 12)
+HUDCorner.Parent = HUD
 
-local hudText = Instance.new("TextLabel")
-hudText.Size = UDim2.new(1, -20, 1, -10)
-hudText.Position = UDim2.new(0, 10, 0, 5)
-hudText.BackgroundTransparency = 1
-hudText.TextColor3 = TEXT
-hudText.TextSize = 11
-hudText.Font = Enum.Font.GothamMedium
-hudText.TextXAlignment = Enum.TextXAlignment.Left
-hudText.TextYAlignment = Enum.TextYAlignment.Center
-hudText.Text = "UltraGpt\nFPS: --\nXYZ: --"
-hudText.Parent = hud
+local HUDText = Instance.new("TextLabel")
+HUDText.Size = UDim2.new(1, -20, 1, -10)
+HUDText.Position = UDim2.new(0, 10, 0, 5)
+HUDText.BackgroundTransparency = 1
+HUDText.TextColor3 = TEXT
+HUDText.TextSize = 11
+HUDText.Font = Enum.Font.GothamMedium
+HUDText.TextXAlignment = Enum.TextXAlignment.Left
+HUDText.TextYAlignment = Enum.TextYAlignment.Center
+HUDText.Text = "UltraGpt v5\nFPS: --\nXYZ: --"
+HUDText.Parent = HUD
 
 --==============================================================
 -- CROSSHAIR
 --==============================================================
 
-local crosshairFrame = Instance.new("Frame")
-crosshairFrame.Size = UDim2.new(0, 30, 0, 30)
-crosshairFrame.Position = UDim2.new(0.5, -15, 0.5, -15)
-crosshairFrame.BackgroundTransparency = 1
-crosshairFrame.Visible = false
-crosshairFrame.Parent = gui
+local CrosshairFrame = Instance.new("Frame")
+CrosshairFrame.Size = UDim2.new(0, 28, 0, 28)
+CrosshairFrame.Position = UDim2.new(0.5, -14, 0.5, -14)
+CrosshairFrame.BackgroundTransparency = 1
+CrosshairFrame.Visible = false
+CrosshairFrame.Parent = GUI
 
-local crosshairHorizontal = Instance.new("Frame")
-crosshairHorizontal.Size = UDim2.new(1, 0, 0, 2)
-crosshairHorizontal.Position = UDim2.new(0, 0, 0.5, -1)
-crosshairHorizontal.BackgroundColor3 = TEXT
-crosshairHorizontal.BorderSizePixel = 0
-crosshairHorizontal.Parent = crosshairFrame
+local CrossH = Instance.new("Frame")
+CrossH.Size = UDim2.new(1, 0, 0, 2)
+CrossH.Position = UDim2.new(0, 0, 0.5, -1)
+CrossH.BackgroundColor3 = TEXT
+CrossH.BorderSizePixel = 0
+CrossH.Parent = CrosshairFrame
 
-local crosshairVertical = Instance.new("Frame")
-crosshairVertical.Size = UDim2.new(0, 2, 1, 0)
-crosshairVertical.Position = UDim2.new(0.5, -1, 0, 0)
-crosshairVertical.BackgroundColor3 = TEXT
-crosshairVertical.BorderSizePixel = 0
-crosshairVertical.Parent = crosshairFrame
+local CrossV = Instance.new("Frame")
+CrossV.Size = UDim2.new(0, 2, 1, 0)
+CrossV.Position = UDim2.new(0.5, -1, 0, 0)
+CrossV.BackgroundColor3 = TEXT
+CrossV.BorderSizePixel = 0
+CrossV.Parent = CrosshairFrame
 
-hudToggle.Button.MouseButton1Click:Connect(function()
-	state.HUD = not state.HUD
-	hud.Visible = state.HUD
-	setToggle(hudToggle, state.HUD)
+HUDToggle.Button.MouseButton1Click:Connect(function()
+	State.HUD = not State.HUD
+
+	HUD.Visible = State.HUD
+
+	setToggle(HUDToggle, State.HUD)
 end)
 
-crosshair.Button.MouseButton1Click:Connect(function()
-	state.Crosshair = not state.Crosshair
-	crosshairFrame.Visible = state.Crosshair
-	setToggle(crosshair, state.Crosshair)
+Crosshair.Button.MouseButton1Click:Connect(function()
+	State.Crosshair = not State.Crosshair
+
+	CrosshairFrame.Visible = State.Crosshair
+
+	setToggle(Crosshair, State.Crosshair)
 end)
 
-resetFOV.Button.MouseButton1Click:Connect(function()
-	tween(camera, {
-		FieldOfView = 70
-	}, 0.3)
+ThirdPerson.Button.MouseButton1Click:Connect(function()
 
-	notify("FOV reset")
+	State.ThirdPerson =
+		not State.ThirdPerson
+
+	if State.ThirdPerson then
+		LocalPlayer.CameraMinZoomDistance = 8
+		LocalPlayer.CameraMaxZoomDistance = 18
+	else
+		LocalPlayer.CameraMinZoomDistance = 0.5
+		LocalPlayer.CameraMaxZoomDistance = 12
+	end
+
+	setToggle(
+		ThirdPerson,
+		State.ThirdPerson
+	)
+
 end)
 
-fovPlus.Button.MouseButton1Click:Connect(function()
-	camera.FieldOfView =
+FOVPlus.Button.MouseButton1Click:Connect(function()
+
+	Camera.FieldOfView =
 		math.clamp(
-			camera.FieldOfView + 10,
+			Camera.FieldOfView + 10,
 			40,
 			120
 		)
 
 	notify(
-		"FOV: " ..
-		math.floor(camera.FieldOfView)
+		"FOV = " ..
+		math.floor(Camera.FieldOfView)
 	)
+
 end)
 
-fovMinus.Button.MouseButton1Click:Connect(function()
-	camera.FieldOfView =
+FOVMinus.Button.MouseButton1Click:Connect(function()
+
+	Camera.FieldOfView =
 		math.clamp(
-			camera.FieldOfView - 10,
+			Camera.FieldOfView - 10,
 			40,
 			120
 		)
 
 	notify(
-		"FOV: " ..
-		math.floor(camera.FieldOfView)
+		"FOV = " ..
+		math.floor(Camera.FieldOfView)
 	)
+
+end)
+
+ResetFOV.Button.MouseButton1Click:Connect(function()
+
+	tween(
+		Camera,
+		{FieldOfView = DEFAULT_FOV},
+		0.3
+	)
+
+	notify("FOV restored")
+
 end)
 
 --==============================================================
 -- SETTINGS PAGE
 --==============================================================
 
-local settingsPage = createPage("Settings")
+local SettingsPage = createPage("Settings")
 
-createSection(settingsPage, "Window")
+createSection(SettingsPage, "Window Size")
 
-local compact = createButton(
-	settingsPage,
+local Compact = createAction(
+	SettingsPage,
 	"Compact",
-	"Small interface"
+	"700 × 470"
 )
 
-local normal = createButton(
-	settingsPage,
+local Normal = createAction(
+	SettingsPage,
 	"Normal",
-	"Default interface"
+	"920 × 600"
 )
 
-local large = createButton(
-	settingsPage,
+local Large = createAction(
+	SettingsPage,
 	"Large",
-	"Large interface"
+	"1040 × 680"
 )
 
-createSection(settingsPage, "Controls")
+createSection(SettingsPage, "Utilities")
 
-local insertInfo = createButton(
-	settingsPage,
-	"Insert",
-	"Show / hide UltraGpt"
+local ResetAll = createAction(
+	SettingsPage,
+	"Reset All",
+	"Restore UltraGpt defaults"
 )
 
-local resetCamera = createButton(
-	settingsPage,
-	"Reset Camera",
-	"Restore FOV and camera settings"
+local About = createAction(
+	SettingsPage,
+	"About UltraGpt",
+	"Show script information"
 )
 
 --==============================================================
 -- WINDOW SIZES
 --==============================================================
 
-local windowSizes = {
+local WindowSizes = {
+
 	Compact = {
-		size = UDim2.new(0, 650, 0, 440),
-		position = UDim2.new(0.5, -325, 0.5, -220)
+		size = UDim2.new(0, 700, 0, 470),
+		pos = UDim2.new(0.5, -350, 0.5, -235)
 	},
 
 	Normal = {
-		size = UDim2.new(0, 850, 0, 560),
-		position = UDim2.new(0.5, -425, 0.5, -280)
+		size = UDim2.new(0, 920, 0, 600),
+		pos = UDim2.new(0.5, -460, 0.5, -300)
 	},
 
 	Large = {
-		size = UDim2.new(0, 1000, 0, 650),
-		position = UDim2.new(0.5, -500, 0.5, -325)
+		size = UDim2.new(0, 1040, 0, 680),
+		pos = UDim2.new(0.5, -520, 0.5, -340)
 	}
+
 }
 
 local function setWindowSize(name)
-	local data = windowSizes[name]
+
+	local data = WindowSizes[name]
 
 	if not data then
 		return
 	end
 
-	state.WindowSize = name
+	tween(
+		Main,
+		{
+			Size = data.size,
+			Position = data.pos
+		},
+		0.35,
+		Enum.EasingStyle.Quart
+	)
 
-	tween(main, {
-		Size = data.size,
-		Position = data.position
-	}, 0.35, Enum.EasingStyle.Quart)
+	notify(
+		"Window: " .. name
+	)
 
-	notify("Window: " .. name)
 end
 
-compact.Button.MouseButton1Click:Connect(function()
+Compact.Button.MouseButton1Click:Connect(function()
 	setWindowSize("Compact")
 end)
 
-normal.Button.MouseButton1Click:Connect(function()
+Normal.Button.MouseButton1Click:Connect(function()
 	setWindowSize("Normal")
 end)
 
-large.Button.MouseButton1Click:Connect(function()
+Large.Button.MouseButton1Click:Connect(function()
 	setWindowSize("Large")
 end)
 
-resetCamera.Button.MouseButton1Click:Connect(function()
-	camera.FieldOfView = 70
-	camera.CameraType = Enum.CameraType.Custom
+--==============================================================
+-- RESET ALL
+--==============================================================
 
-	notify("Camera reset")
+ResetAll.Button.MouseButton1Click:Connect(function()
+
+	stopFly()
+	stopNoClip()
+
+	disconnect("InfiniteJump")
+	disconnect("Spin")
+
+	State.Fly = false
+	State.NoClip = false
+	State.Speed = false
+	State.Boost = false
+	State.InfiniteJump = false
+	State.Spin = false
+	State.Freeze = false
+	State.Anchor = false
+	State.FullBright = false
+	State.NoShadows = false
+	State.LowGravity = false
+	State.Crosshair = false
+	State.ThirdPerson = false
+	State.AutoRotate = true
+	State.HUD = true
+
+	WalkSpeedValue = DEFAULT_WALK_SPEED
+	JumpPowerValue = DEFAULT_JUMP_POWER
+
+	if Humanoid then
+		Humanoid.WalkSpeed = DEFAULT_WALK_SPEED
+		Humanoid.JumpPower = DEFAULT_JUMP_POWER
+		Humanoid.AutoRotate = true
+	end
+
+	if RootPart then
+		RootPart.Anchored = false
+	end
+
+	workspace.Gravity = DEFAULT_GRAVITY
+
+	Lighting.GlobalShadows = true
+	Lighting.Brightness = 1
+
+	Camera.FieldOfView = DEFAULT_FOV
+
+	LocalPlayer.CameraMinZoomDistance = 0.5
+	LocalPlayer.CameraMaxZoomDistance = 12
+
+	HUD.Visible = true
+	CrosshairFrame.Visible = false
+
+	setToggle(Fly, false)
+	setToggle(NoClip, false)
+	setToggle(Speed, false)
+	setToggle(Boost, false)
+	setToggle(InfiniteJump, false)
+	setToggle(AutoRotate, true)
+
+	setToggle(Spin, false)
+	setToggle(Freeze, false)
+	setToggle(Anchor, false)
+
+	setToggle(FullBright, false)
+	setToggle(NoShadows, false)
+	setToggle(LowGravity, false)
+
+	setToggle(HUDToggle, true)
+	setToggle(Crosshair, false)
+	setToggle(ThirdPerson, false)
+
+	notify("All settings reset", 3)
+
 end)
 
-insertInfo.Button.MouseButton1Click:Connect(function()
-	notify("Insert открывает и закрывает панель")
+About.Button.MouseButton1Click:Connect(function()
+
+	notify(
+		"UltraGpt v5 • Roblox Studio Test Hub",
+		4
+	)
+
 end)
 
 --==============================================================
 -- NAVIGATION
 --==============================================================
 
-local navItems = {
+local Navigation = {}
+
+local PageInfo = {
+
 	{
 		name = "Character",
 		icon = "◆",
@@ -1460,7 +2030,7 @@ local navItems = {
 		name = "Teleport",
 		icon = "◎",
 		title = "Teleport",
-		sub = "Position tools"
+		sub = "Position and player tools"
 	},
 
 	{
@@ -1476,262 +2046,396 @@ local navItems = {
 		title = "Settings",
 		sub = "UltraGpt configuration"
 	}
+
 }
 
-local navButtons = {}
-
 local function selectPage(name)
-	currentPage = name
 
-	for pageName, page in pairs(pageFrames) do
-		page.Visible = pageName == name
+	CurrentPage = name
+
+	for pageName, page in pairs(PageFrames) do
+		page.Visible =
+			pageName == name
 	end
 
-	for buttonName, object in pairs(navButtons) do
+	for buttonName, object in pairs(Navigation) do
+
 		if buttonName == name then
-			object.BackgroundColor3 = ACCENT_DARK
+
+			object.Button.BackgroundColor3 =
+				ACCENT_DARK
+
 			object.Icon.TextColor3 = TEXT
 			object.Label.TextColor3 = TEXT
 
-			tween(object, {
-				Position = UDim2.new(
-					0, 5, 0, 0
-				)
-			}, 0.15)
+			tween(
+				object.Button,
+				{
+					Position =
+						UDim2.new(0, 5, 0, 0)
+				},
+				0.15
+			)
+
 		else
-			object.BackgroundColor3 = BUTTON
-			object.Icon.TextColor3 = SUBTEXT
-			object.Label.TextColor3 = SUBTEXT
 
-			tween(object, {
-				Position = UDim2.new(
-					0, 0, 0, 0
-				)
-			}, 0.15)
+			object.Button.BackgroundColor3 = BUTTON
+
+			object.Icon.TextColor3 =
+				SUBTEXT
+
+			object.Label.TextColor3 =
+				SUBTEXT
+
+			tween(
+				object.Button,
+				{
+					Position =
+						UDim2.new(0, 0, 0, 0)
+				},
+				0.15
+			)
+
 		end
 	end
 
-	for _, item in ipairs(navItems) do
-		if item.name == name then
-			pageTitle.Text = item.title
-			pageSub.Text = item.sub
+	for _, info in ipairs(PageInfo) do
+
+		if info.name == name then
+
+			PageTitle.Text = info.title
+			PageSubtitle.Text = info.sub
+
 			break
+
 		end
+
 	end
+
 end
 
-for _, item in ipairs(navItems) do
-	local button = Instance.new("TextButton")
+for index, info in ipairs(PageInfo) do
 
-	button.Size = UDim2.new(1, 0, 0, 42)
+	local button =
+		Instance.new("TextButton")
+
+	button.Size =
+		UDim2.new(1, 0, 0, 42)
+
 	button.BackgroundColor3 = BUTTON
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Text = ""
-	button.LayoutOrder = #navButtons + 1
-	button.Parent = sidebar
+	button.LayoutOrder = index
+	button.Parent = Sidebar
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 9)
+	corner.CornerRadius =
+		UDim.new(0, 9)
 	corner.Parent = button
 
-	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(0, 30, 1, 0)
-	icon.Position = UDim2.new(0, 8, 0, 0)
+	local icon =
+		Instance.new("TextLabel")
+
+	icon.Size =
+		UDim2.new(0, 32, 1, 0)
+
+	icon.Position =
+		UDim2.new(0, 8, 0, 0)
+
 	icon.BackgroundTransparency = 1
-	icon.Text = item.icon
+	icon.Text = info.icon
 	icon.TextColor3 = SUBTEXT
 	icon.TextSize = 14
 	icon.Font = Enum.Font.GothamBold
 	icon.Parent = button
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -45, 1, 0)
-	label.Position = UDim2.new(0, 42, 0, 0)
+	local label =
+		Instance.new("TextLabel")
+
+	label.Size =
+		UDim2.new(1, -50, 1, 0)
+
+	label.Position =
+		UDim2.new(0, 43, 0, 0)
+
 	label.BackgroundTransparency = 1
-	label.Text = item.name
+	label.Text = info.name
 	label.TextColor3 = SUBTEXT
 	label.TextSize = 11
 	label.Font = Enum.Font.GothamSemibold
-	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextXAlignment =
+		Enum.TextXAlignment.Left
 	label.Parent = button
 
-	navButtons[item.name] = {
+	Navigation[info.name] = {
 		Button = button,
 		Icon = icon,
 		Label = label
 	}
 
 	button.MouseEnter:Connect(function()
-		if currentPage ~= item.name then
-			tween(button, {
-				BackgroundColor3 = BUTTON_HOVER
-			}, 0.12)
+
+		if CurrentPage ~= info.name then
+
+			tween(
+				button,
+				{
+					BackgroundColor3 =
+						BUTTON_HOVER
+				},
+				0.12
+			)
+
 		end
+
 	end)
 
 	button.MouseLeave:Connect(function()
-		if currentPage ~= item.name then
-			tween(button, {
-				BackgroundColor3 = BUTTON
-			}, 0.12)
+
+		if CurrentPage ~= info.name then
+
+			tween(
+				button,
+				{
+					BackgroundColor3 = BUTTON
+				},
+				0.12
+			)
+
 		end
+
 	end)
 
 	button.MouseButton1Click:Connect(function()
-		selectPage(item.name)
+		selectPage(info.name)
 	end)
+
 end
 
 --==============================================================
--- DRAGGING
+-- DRAG
 --==============================================================
 
 local dragging = false
 local dragStart
 local startPosition
 
-topBar.InputBegan:Connect(function(input)
+TopBar.InputBegan:Connect(function(input)
+
 	if input.UserInputType ==
 		Enum.UserInputType.MouseButton1 then
 
 		dragging = true
 		dragStart = input.Position
-		startPosition = main.Position
+		startPosition = Main.Position
 
 		input.Changed:Connect(function()
+
 			if input.UserInputState ==
 				Enum.UserInputState.End then
 
 				dragging = false
+
 			end
+
 		end)
+
 	end
+
 end)
 
 UserInputService.InputChanged:Connect(function(input)
+
 	if dragging and
 		input.UserInputType ==
 		Enum.UserInputType.MouseMovement then
 
-		local delta = input.Position - dragStart
+		local delta =
+			input.Position - dragStart
 
-		main.Position = UDim2.new(
+		Main.Position = UDim2.new(
 			startPosition.X.Scale,
 			startPosition.X.Offset + delta.X,
 			startPosition.Y.Scale,
 			startPosition.Y.Offset + delta.Y
 		)
+
 	end
+
 end)
 
 --==============================================================
 -- INSERT
 --==============================================================
 
-local menuVisible = true
+local function showMenu()
 
-local function setMenuVisible(visible)
-	menuVisible = visible
+	MenuVisible = true
+	Main.Visible = true
 
-	if visible then
-		main.Visible = true
+	local normalSize =
+		WindowSizes.Normal.size
 
-		main.Size = UDim2.new(
+	Main.Size =
+		UDim2.new(
 			0,
-			windowSizes[state.WindowSize].size.X.Offset * 0.94,
+			math.floor(
+				normalSize.X.Offset * 0.94
+			),
 			0,
-			windowSizes[state.WindowSize].size.Y.Offset * 0.94
+			math.floor(
+				normalSize.Y.Offset * 0.94
+			)
 		)
 
-		tween(main, {
-			Size = windowSizes[state.WindowSize].size
-		}, 0.22, Enum.EasingStyle.Back)
+	tween(
+		Main,
+		{
+			Size = normalSize
+		},
+		0.22,
+		Enum.EasingStyle.Back
+	)
 
-	else
-		tween(main, {
-			Size = UDim2.new(0, 0, 0, 0)
-		}, 0.18)
-
-		task.delay(0.19, function()
-			if not menuVisible then
-				main.Visible = false
-			end
-		end)
-	end
 end
 
-UserInputService.InputBegan:Connect(function(input, processed)
+local function hideMenu()
+
+	MenuVisible = false
+
+	local animation =
+		tween(
+			Main,
+			{
+				Size =
+					UDim2.new(0, 0, 0, 0)
+			},
+			0.18
+		)
+
+	animation.Completed:Connect(function()
+
+		if not MenuVisible then
+			Main.Visible = false
+		end
+
+	end)
+
+end
+
+UserInputService.InputBegan:Connect(function(
+	input,
+	processed
+)
+
 	if processed then
 		return
 	end
 
 	if input.KeyCode == MENU_KEY then
-		setMenuVisible(not menuVisible)
+
+		if MenuVisible then
+			hideMenu()
+		else
+			showMenu()
+		end
+
 	end
+
 end)
 
 --==============================================================
 -- FPS / HUD
 --==============================================================
 
-local fps = 60
-local frames = 0
-local fpsTime = 0
+local FPS = 60
+local Frames = 0
+local FPSTimer = 0
 
 RunService.RenderStepped:Connect(function(delta)
-	frames += 1
-	fpsTime += delta
 
-	if fpsTime >= 1 then
-		fps = math.floor(frames / fpsTime)
+	Frames += 1
+	FPSTimer += delta
 
-		frames = 0
-		fpsTime = 0
+	if FPSTimer >= 1 then
+
+		FPS =
+			math.floor(
+				Frames / FPSTimer
+			)
+
+		Frames = 0
+		FPSTimer = 0
+
 	end
 
-	if rootPart then
-		local pos = rootPart.Position
+	if RootPart then
 
-		hudText.Text =
-			"UltraGpt v3" ..
-			"\nFPS: " .. fps ..
+		local pos =
+			RootPart.Position
+
+		HUDText.Text =
+			"UltraGpt v5" ..
+			"\nFPS: " .. FPS ..
 			"\nXYZ: " ..
 			math.floor(pos.X) ..
 			", " ..
 			math.floor(pos.Y) ..
 			", " ..
 			math.floor(pos.Z)
+
 	end
+
 end)
 
 --==============================================================
--- RESPAWN HANDLER
+-- RESPAWN
 --==============================================================
 
-player.CharacterAdded:Connect(function()
-	task.wait(0.4)
+LocalPlayer.CharacterAdded:Connect(function()
+
+	task.wait(0.5)
 
 	updateCharacter()
 
-	state.Fly = false
-	state.NoClip = false
-	state.Speed = false
-	state.Boost = false
-	state.InfiniteJump = false
+	stopFly()
+	stopNoClip()
 
-	disconnect("Fly")
-	disconnect("NoClip")
 	disconnect("InfiniteJump")
 	disconnect("Spin")
 
-	setToggle(fly, false)
-	setToggle(noclip, false)
-	setToggle(speed, false)
-	setToggle(boost, false)
-	setToggle(infiniteJump, false)
+	State.Speed = false
+	State.Boost = false
+	State.InfiniteJump = false
+	State.Spin = false
+	State.Freeze = false
+	State.Anchor = false
+
+	WalkSpeedValue = DEFAULT_WALK_SPEED
+	JumpPowerValue = DEFAULT_JUMP_POWER
+
+	setToggle(Fly, false)
+	setToggle(NoClip, false)
+	setToggle(Speed, false)
+	setToggle(Boost, false)
+	setToggle(InfiniteJump, false)
+	setToggle(Spin, false)
+	setToggle(Freeze, false)
+	setToggle(Anchor, false)
+
+	if Humanoid then
+		Humanoid.WalkSpeed =
+			DEFAULT_WALK_SPEED
+
+		Humanoid.JumpPower =
+			DEFAULT_JUMP_POWER
+
+		Humanoid.AutoRotate = true
+	end
 
 	notify("Character loaded")
+
 end)
 
 --==============================================================
@@ -1739,14 +2443,24 @@ end)
 --==============================================================
 
 selectPage("Character")
+
+setToggle(AutoRotate, true)
+setToggle(HUDToggle, true)
+setToggle(Crosshair, false)
+setToggle(ThirdPerson, false)
+
 setWindowSize("Normal")
 
-setToggle(rotate, true)
-setToggle(hudToggle, true)
+notify(
+	"UltraGpt v5 loaded",
+	3
+)
 
-notify("UltraGpt v3 загружен", 3)
-
-print("================================")
-print("UltraGpt v3 loaded")
+print("======================================")
+print("             UltraGpt v5")
+print("======================================")
 print("Insert = Show / Hide")
-print("================================")
+print("Teleport = Player selector")
+print("======================================")
+```
+
