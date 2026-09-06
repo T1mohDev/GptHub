@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/T1mohDev/GptHub/refs/heads/main/GptScript%20(ByChatGpt)"))()
