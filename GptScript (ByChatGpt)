@@ -1,15 +1,17 @@
 --==============================================================
---                       ULTRAGPT v9
+--                       ULTRAGPT v10
 --                 MONOCHROME TEST PANEL
 --==============================================================
 --
 -- Для собственного Roblox Studio тестового place.
 --
--- INSERT  = открыть / закрыть меню
+-- INSERT = показать / скрыть меню
+-- R      = Launch
 --
--- SPACE (Fun) =
---     Gravity = 0
---     + редкие слабые случайные физические импульсы
+-- V10:
+--   + Launch на R
+--   + Animations
+--   + Shaders / Visual Enhancer
 --
 --==============================================================
 
@@ -53,7 +55,9 @@ local OriginalLighting = {
     ClockTime = Lighting.ClockTime,
     FogEnd = Lighting.FogEnd,
     GlobalShadows = Lighting.GlobalShadows,
-    ExposureCompensation = Lighting.ExposureCompensation
+    ExposureCompensation = Lighting.ExposureCompensation,
+    EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+    EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale
 }
 
 
@@ -160,6 +164,15 @@ local State = {
 
 
     -----------------------------------------------------------
+    -- ANIMATION
+    -----------------------------------------------------------
+
+    AnimationId = nil,
+    CurrentAnimation = nil,
+    CurrentAnimationObject = nil,
+
+
+    -----------------------------------------------------------
     -- UI
     -----------------------------------------------------------
 
@@ -232,6 +245,21 @@ local RainbowHue = 0
 ---------------------------------------------------------------
 
 local SavedCFrame = nil
+
+
+---------------------------------------------------------------
+-- SHADER EFFECTS
+---------------------------------------------------------------
+
+local ShaderEffects = {}
+
+local ShaderState = {
+    Bloom = false,
+    ColorCorrection = false,
+    SunRays = false,
+    DepthOfField = false,
+    Cinematic = false
+}
 
 
 ---------------------------------------------------------------
@@ -322,6 +350,7 @@ local function GetCharacter()
     end
 
     return Character, Humanoid, RootPart
+
 end
 
 
@@ -343,22 +372,28 @@ local function SafeNumber(
         minimum,
         maximum
     )
+
 end
 
 
-local function DestroyObject(object)
+local function DestroyObject(
+    object
+)
 
     if object then
 
         pcall(
             function()
+
                 object:Destroy()
+
             end
         )
 
     end
 
     return nil
+
 end
 
 
@@ -486,6 +521,7 @@ local function Notify(
 
     frame.BorderSizePixel =
         0
+
 
     local corner =
         Instance.new("UICorner")
@@ -655,6 +691,7 @@ local function Notify(
                     }
                 )
 
+
             tween:Play()
 
 
@@ -746,7 +783,7 @@ MainStroke.Parent =
 
 
 ---------------------------------------------------------------
--- TOPBAR
+-- TOP BAR
 ---------------------------------------------------------------
 
 local TopBar =
@@ -880,7 +917,7 @@ LogoSub.Size =
     )
 
 LogoSub.Text =
-    "TEST PANEL  /  V9"
+    "TEST PANEL  /  V10"
 
 LogoSub.TextColor3 =
     C.DARKGRAY
@@ -899,7 +936,7 @@ LogoSub.Parent =
 
 
 ---------------------------------------------------------------
--- SEARCH BUTTON
+-- SEARCH
 ---------------------------------------------------------------
 
 local SearchButton =
@@ -957,7 +994,7 @@ SearchButtonCorner.Parent =
 
 
 ---------------------------------------------------------------
--- COMPACT BUTTON
+-- COMPACT
 ---------------------------------------------------------------
 
 local CompactButton =
@@ -1078,7 +1115,7 @@ Content.Parent =
 
 
 ---------------------------------------------------------------
--- DRAGGING
+-- DRAG
 ---------------------------------------------------------------
 
 do
@@ -1095,6 +1132,7 @@ do
                 ~= Enum.UserInputType.MouseButton1 then
 
                 return
+
             end
 
 
@@ -1136,6 +1174,7 @@ do
                 ~= Enum.UserInputType.MouseMovement then
 
                 return
+
             end
 
 
@@ -1172,6 +1211,8 @@ local Tabs = {
     "Teleport",
     "Visual",
     "World",
+    "Animations",
+    "Shaders",
     "Settings"
 }
 
@@ -1180,7 +1221,9 @@ local TabButtons = {}
 local Pages = {}
 
 
-for index, tabName in ipairs(Tabs) do
+for index, tabName in ipairs(
+    Tabs
+) do
 
     local button =
         Instance.new("TextButton")
@@ -1198,7 +1241,10 @@ for index, tabName in ipairs(Tabs) do
             0,
             10,
             0,
-            10 + ((index - 1) * 41)
+            10 + (
+                (index - 1) *
+                37
+            )
         )
 
     button.BackgroundColor3 =
@@ -1214,7 +1260,7 @@ for index, tabName in ipairs(Tabs) do
         Enum.Font.GothamMedium
 
     button.TextSize =
-        11
+        10
 
     button.AutoButtonColor =
         false
@@ -1245,7 +1291,9 @@ for index, tabName in ipairs(Tabs) do
 end
 
 
-for _, name in ipairs(Tabs) do
+for _, name in ipairs(
+    Tabs
+) do
 
     local page =
         Instance.new("Frame")
@@ -1274,6 +1322,7 @@ for _, name in ipairs(Tabs) do
 
     page.Parent =
         Content
+
 
     Pages[name] =
         page
@@ -1430,7 +1479,7 @@ end
 
 
 ---------------------------------------------------------------
--- GET TOGGLE STATE
+-- GET STATE
 ---------------------------------------------------------------
 
 local function GetState(
@@ -1446,8 +1495,8 @@ local function GetState(
         ["God Mode"] = "GodMode",
         Freeze = "Freeze",
 
+        SPACE = "Space",
         Space = "Space",
-        ["SPACE"] = "Space",
 
         Float = "Float",
         ["Moon Jump"] = "MoonJump",
@@ -1677,14 +1726,14 @@ local function Button(
                     function()
 
                         local active =
-                            GetState(
-                                name
-                            )
+                            GetState(name)
+
 
                         status.Text =
                             active
                             and "ON"
                             or "OFF"
+
 
                         status.TextColor3 =
                             active
@@ -2010,7 +2059,7 @@ end
 
 
 ---------------------------------------------------------------
--- POSITION FORCE CREATOR
+-- POSITION FORCE
 ---------------------------------------------------------------
 
 local function CreatePositionForce(
@@ -2070,13 +2119,16 @@ end
 
 local function StopFly()
 
-    State.Fly = false
+    State.Fly =
+        false
 
 
     if FlyVelocity then
 
         FlyVelocity:Destroy()
-        FlyVelocity = nil
+
+        FlyVelocity =
+            nil
 
     end
 
@@ -2084,7 +2136,9 @@ local function StopFly()
     if FlyAttachment then
 
         FlyAttachment:Destroy()
-        FlyAttachment = nil
+
+        FlyAttachment =
+            nil
 
     end
 
@@ -2182,6 +2236,7 @@ local function SetFly(
             "Fly",
             "Выключен"
         )
+
     end
 
 end
@@ -2308,6 +2363,7 @@ local function SaveNoClipValues()
                 object.CanCollide
 
         end
+
     end
 
 end
@@ -2340,6 +2396,7 @@ local function SetNoClip(
                     false
 
             end
+
         end
 
 
@@ -2515,6 +2572,7 @@ local function UpdateBouncy()
                 58,
                 root.AssemblyLinearVelocity.Z
             )
+
     end
 
 end
@@ -2577,13 +2635,15 @@ local function SetFloat(
 
     if enabled then
 
-        if FloatPosition then
-            FloatPosition:Destroy()
-        end
+        FloatPosition =
+            DestroyObject(
+                FloatPosition
+            )
 
-        if FloatAttachment then
-            FloatAttachment:Destroy()
-        end
+        FloatAttachment =
+            DestroyObject(
+                FloatAttachment
+            )
 
 
         FloatAttachment,
@@ -2632,6 +2692,7 @@ local function UpdateFloat()
         or not FloatPosition then
 
         return
+
     end
 
 
@@ -2643,7 +2704,8 @@ local function UpdateFloat()
 
         FloatPosition.Position =
             root.Position
-            + Vector3.new(
+            +
+            Vector3.new(
                 0,
                 math.sin(
                     os.clock() * 2
@@ -2681,6 +2743,7 @@ local function SaveIceValues()
                 object.CustomPhysicalProperties
 
         end
+
     end
 
 end
@@ -2719,6 +2782,7 @@ local function SetIce(
                     )
 
             end
+
         end
 
 
@@ -2741,6 +2805,7 @@ local function SetIce(
                     original
 
             end
+
         end
 
 
@@ -2787,6 +2852,7 @@ local function SetGhost(
                 or 0
 
         end
+
     end
 
 
@@ -2879,6 +2945,7 @@ local function UpdateRandomSpin(
             )
 
         end
+
     end
 
 end
@@ -2933,10 +3000,11 @@ end
 ---------------------------------------------------------------
 -- SPACE
 --
--- ВАЖНО:
+-- Точно по твоей задумке:
+-- Gravity = 0.
 -- Никакого CFrame.
--- Никакого поиска случайных точек.
--- Только Gravity 0 + маленькие импульсы.
+-- Никаких случайных телепортов.
+-- Только редкие небольшие импульсы.
 ---------------------------------------------------------------
 
 local function SetSpace(
@@ -3088,16 +3156,13 @@ local function SetOrbit(
     if enabled then
 
         if not root then
-            State.Orbit = false
+
+            State.Orbit =
+                false
+
             return
+
         end
-
-
-        State.FollowPlayer =
-            false
-
-        State.PlayerOrbit =
-            false
 
 
         OrbitCenter =
@@ -3108,43 +3173,35 @@ local function SetOrbit(
             0
 
 
-        if NormalOrbitPosition then
-            NormalOrbitPosition:Destroy()
-        end
-
-        if NormalOrbitAttachment then
-            NormalOrbitAttachment:Destroy()
-        end
-
-
-        NormalOrbitAttachment,
-        NormalOrbitPosition =
-            CreatePositionForce(
-                root,
-                "UltraGptOrbit"
-            )
-
-
         Notify(
             "Orbit",
-            "Орбита вокруг сохранённого центра"
+            "Центр орбиты сохранён"
         )
 
     else
 
-        NormalOrbitPosition =
-            DestroyObject(
-                NormalOrbitPosition
-            )
-
-        NormalOrbitAttachment =
-            DestroyObject(
-                NormalOrbitAttachment
-            )
-
-
         OrbitCenter =
             nil
+
+
+        if NormalOrbitPosition then
+
+            NormalOrbitPosition:Destroy()
+
+            NormalOrbitPosition =
+                nil
+
+        end
+
+
+        if NormalOrbitAttachment then
+
+            NormalOrbitAttachment:Destroy()
+
+            NormalOrbitAttachment =
+                nil
+
+        end
 
 
         Notify(
@@ -3162,9 +3219,17 @@ local function UpdateOrbit(
 )
 
     if not State.Orbit
-        or not OrbitCenter
-        or not NormalOrbitPosition then
+        or not OrbitCenter then
 
+        return
+    end
+
+
+    local _, _, root =
+        GetCharacter()
+
+
+    if not root then
         return
     end
 
@@ -3178,7 +3243,7 @@ local function UpdateOrbit(
         14
 
 
-    local position =
+    local targetPosition =
         OrbitCenter +
         Vector3.new(
 
@@ -3200,8 +3265,20 @@ local function UpdateOrbit(
         )
 
 
-    NormalOrbitPosition.Position =
-        position
+    root.AssemblyLinearVelocity =
+        root.AssemblyLinearVelocity:Lerp(
+            (
+                targetPosition -
+                root.Position
+            ) *
+            1.8,
+
+            math.clamp(
+                delta * 3,
+                0,
+                1
+            )
+        )
 
 end
 
@@ -3225,12 +3302,15 @@ local function SetPlayerOrbit(
             State.PlayerOrbit =
                 false
 
+
             Notify(
                 "Player Orbit",
                 "Сначала выбери игрока"
             )
 
+
             return
+
         end
 
 
@@ -3238,8 +3318,15 @@ local function SetPlayerOrbit(
             false
 
 
-        RemoveFollowForce =
-            nil
+        FollowPosition =
+            DestroyObject(
+                FollowPosition
+            )
+
+        FollowAttachment =
+            DestroyObject(
+                FollowAttachment
+            )
 
 
         local _, _, root =
@@ -3252,6 +3339,7 @@ local function SetPlayerOrbit(
                 false
 
             return
+
         end
 
 
@@ -3259,14 +3347,14 @@ local function SetPlayerOrbit(
             0
 
 
-        PlayerOrbitAttachment =
-            DestroyObject(
-                PlayerOrbitAttachment
-            )
-
         PlayerOrbitPosition =
             DestroyObject(
                 PlayerOrbitPosition
+            )
+
+        PlayerOrbitAttachment =
+            DestroyObject(
+                PlayerOrbitAttachment
             )
 
 
@@ -3327,6 +3415,7 @@ local function UpdatePlayerOrbit(
             false
 
         return
+
     end
 
 
@@ -3367,18 +3456,6 @@ local function UpdatePlayerOrbit(
 
     end
 
-
-    -----------------------------------------------------------
-    -- ОЧЕНЬ ВАЖНО:
-    -- центр орбиты каждый кадр = позиция игрока.
-    --
-    -- Сам угол меняется медленно.
-    --
-    -- Поэтому ты:
-    -- 1. двигаешься за игроком,
-    -- 2. летишь по окружности,
-    -- 3. не остаёшься позади.
-    -----------------------------------------------------------
 
     PlayerOrbitAngle +=
         delta *
@@ -3443,12 +3520,15 @@ local function SetFollow(
             State.FollowPlayer =
                 false
 
+
             Notify(
                 "Follow",
                 "Сначала выбери игрока"
             )
 
+
             return
+
         end
 
 
@@ -3477,6 +3557,7 @@ local function SetFollow(
                 false
 
             return
+
         end
 
 
@@ -3534,6 +3615,7 @@ local function UpdateFollow()
         or not FollowPosition then
 
         return
+
     end
 
 
@@ -3546,6 +3628,7 @@ local function UpdateFollow()
         SetFollow(false)
 
         return
+
     end
 
 
@@ -3568,13 +3651,6 @@ local function UpdateFollow()
         return
     end
 
-
-    -----------------------------------------------------------
-    -- Позиция немного позади + выше цели.
-    --
-    -- AlignPosition имеет высокий MaxVelocity,
-    -- поэтому следование не "черепашье".
-    -----------------------------------------------------------
 
     local destination =
         targetRoot.Position
@@ -3652,7 +3728,9 @@ local function TeleportPlayer(
             "Игрок не выбран"
         )
 
+
         return
+
     end
 
 
@@ -3667,7 +3745,9 @@ local function TeleportPlayer(
             "Персонаж недоступен"
         )
 
+
         return
+
     end
 
 
@@ -3741,25 +3821,25 @@ local function ReturnPosition()
     end
 
 
-    if not SavedCFrame then
+    if SavedCFrame then
+
+        root.CFrame =
+            SavedCFrame
+
+
+        Notify(
+            "Position",
+            "Возврат выполнен"
+        )
+
+    else
 
         Notify(
             "Position",
             "Нет сохранённой позиции"
         )
 
-        return
     end
-
-
-    root.CFrame =
-        SavedCFrame
-
-
-    Notify(
-        "Position",
-        "Возвращено"
-    )
 
 end
 
@@ -3873,6 +3953,7 @@ local function AddXRay(
         ) then
 
         return
+
     end
 
 
@@ -3963,6 +4044,7 @@ local function SetXRay(
                     1
 
             end
+
         end
 
 
@@ -4017,6 +4099,7 @@ local function AddESP(
         LocalPlayer then
 
         return
+
     end
 
 
@@ -4145,6 +4228,7 @@ local function SaveRainbowColors()
                 object.Color
 
         end
+
     end
 
 end
@@ -4164,6 +4248,7 @@ local function RestoreRainbowColors()
                 color
 
         end
+
     end
 
 
@@ -4219,7 +4304,8 @@ local function UpdateRainbow()
 
 
     if RainbowHue > 1 then
-        RainbowHue = 0
+        RainbowHue =
+            0
     end
 
 
@@ -4245,36 +4331,6 @@ local function UpdateRainbow()
                 color
 
         end
-    end
-
-end
-
-
----------------------------------------------------------------
--- GOD MODE
----------------------------------------------------------------
-
-local function UpdateGodMode()
-
-    if not State.GodMode then
-        return
-    end
-
-
-    local _, hum =
-        GetCharacter()
-
-
-    if not hum then
-        return
-    end
-
-
-    if hum.Health <
-        hum.MaxHealth then
-
-        hum.Health =
-            hum.MaxHealth
 
     end
 
@@ -4282,44 +4338,8 @@ end
 
 
 ---------------------------------------------------------------
--- CHAOS ACTIONS
+-- LAUNCH
 ---------------------------------------------------------------
-
-local function Flip()
-
-    local _, _, root =
-        GetCharacter()
-
-
-    if root then
-
-        root:ApplyAngularImpulse(
-            Vector3.new(
-                math.random(
-                    -35,
-                    35
-                ),
-                math.random(
-                    -35,
-                    35
-                ),
-                math.random(
-                    -35,
-                    35
-                )
-            )
-        )
-
-
-        Notify(
-            "Flip",
-            "Вращение запущено"
-        )
-
-    end
-
-end
-
 
 local function Launch()
 
@@ -4344,6 +4364,10 @@ local function Launch()
 
 end
 
+
+---------------------------------------------------------------
+-- RANDOM LAUNCH
+---------------------------------------------------------------
 
 local function RandomLaunch()
 
@@ -4394,6 +4418,10 @@ local function RandomLaunch()
 end
 
 
+---------------------------------------------------------------
+-- YEET
+---------------------------------------------------------------
+
 local function Yeet()
 
     local _, _, root =
@@ -4427,6 +4455,50 @@ local function Yeet()
 end
 
 
+---------------------------------------------------------------
+-- FLIP
+---------------------------------------------------------------
+
+local function Flip()
+
+    local _, _, root =
+        GetCharacter()
+
+
+    if root then
+
+        root:ApplyAngularImpulse(
+            Vector3.new(
+                math.random(
+                    -35,
+                    35
+                ),
+                math.random(
+                    -35,
+                    35
+                ),
+                math.random(
+                    -35,
+                    35
+                )
+            )
+        )
+
+
+        Notify(
+            "Flip",
+            "Вращение запущено"
+        )
+
+    end
+
+end
+
+
+---------------------------------------------------------------
+-- GRAVITY
+---------------------------------------------------------------
+
 local function LowGravity()
 
     Workspace.Gravity =
@@ -4449,8 +4521,656 @@ local function RestoreGravity()
 
     Notify(
         "Gravity",
-        "Исходная гравитация восстановлена"
+        "Восстановлена"
     )
+
+end
+
+
+---------------------------------------------------------------
+-- SHADERS
+---------------------------------------------------------------
+
+local function RemoveShader(
+    name
+)
+
+    local object =
+        ShaderEffects[name]
+
+
+    if object then
+
+        object:Destroy()
+
+        ShaderEffects[name] =
+            nil
+
+    end
+
+end
+
+
+local function EnableBloom()
+
+    RemoveShader(
+        "Bloom"
+    )
+
+
+    local bloom =
+        Instance.new(
+            "BloomEffect"
+        )
+
+    bloom.Name =
+        "UltraGpt_Bloom"
+
+    bloom.Intensity =
+        0.28
+
+    bloom.Size =
+        24
+
+    bloom.Threshold =
+        1.1
+
+    bloom.Parent =
+        Lighting
+
+
+    ShaderEffects.Bloom =
+        bloom
+
+
+    ShaderState.Bloom =
+        true
+
+end
+
+
+local function DisableBloom()
+
+    RemoveShader(
+        "Bloom"
+    )
+
+    ShaderState.Bloom =
+        false
+
+end
+
+
+local function EnableColorCorrection()
+
+    RemoveShader(
+        "ColorCorrection"
+    )
+
+
+    local effect =
+        Instance.new(
+            "ColorCorrectionEffect"
+        )
+
+    effect.Name =
+        "UltraGpt_ColorCorrection"
+
+    effect.Brightness =
+        0.03
+
+    effect.Contrast =
+        0.12
+
+    effect.Saturation =
+        0.08
+
+    effect.TintColor =
+        Color3.fromRGB(
+            255,
+            255,
+            255
+        )
+
+    effect.Parent =
+        Lighting
+
+
+    ShaderEffects.ColorCorrection =
+        effect
+
+
+    ShaderState.ColorCorrection =
+        true
+
+end
+
+
+local function DisableColorCorrection()
+
+    RemoveShader(
+        "ColorCorrection"
+    )
+
+    ShaderState.ColorCorrection =
+        false
+
+end
+
+
+local function EnableSunRays()
+
+    RemoveShader(
+        "SunRays"
+    )
+
+
+    local effect =
+        Instance.new(
+            "SunRaysEffect"
+        )
+
+    effect.Name =
+        "UltraGpt_SunRays"
+
+    effect.Intensity =
+        0.07
+
+    effect.Spread =
+        0.75
+
+    effect.Parent =
+        Lighting
+
+
+    ShaderEffects.SunRays =
+        effect
+
+
+    ShaderState.SunRays =
+        true
+
+end
+
+
+local function DisableSunRays()
+
+    RemoveShader(
+        "SunRays"
+    )
+
+    ShaderState.SunRays =
+        false
+
+end
+
+
+local function EnableDepthOfField()
+
+    RemoveShader(
+        "DepthOfField"
+    )
+
+
+    local effect =
+        Instance.new(
+            "DepthOfFieldEffect"
+        )
+
+    effect.Name =
+        "UltraGpt_DepthOfField"
+
+    effect.FarIntensity =
+        0.08
+
+    effect.FocusDistance =
+        35
+
+    effect.InFocusRadius =
+        22
+
+    effect.NearIntensity =
+        0.03
+
+    effect.Parent =
+        Lighting
+
+
+    ShaderEffects.DepthOfField =
+        effect
+
+
+    ShaderState.DepthOfField =
+        true
+
+end
+
+
+local function DisableDepthOfField()
+
+    RemoveShader(
+        "DepthOfField"
+    )
+
+    ShaderState.DepthOfField =
+        false
+
+end
+
+
+---------------------------------------------------------------
+-- ENHANCED LIGHTING
+---------------------------------------------------------------
+
+local LightingEnhanced =
+    false
+
+
+local function EnableEnhancedLighting()
+
+    LightingEnhanced =
+        true
+
+
+    Lighting.GlobalShadows =
+        true
+
+
+    Lighting.Brightness =
+        math.max(
+            Lighting.Brightness,
+            2
+        )
+
+
+    Lighting.EnvironmentDiffuseScale =
+        1
+
+
+    Lighting.EnvironmentSpecularScale =
+        1
+
+
+    Lighting.ExposureCompensation =
+        0
+
+
+    Notify(
+        "Lighting",
+        "Enhanced Lighting включён"
+    )
+
+end
+
+
+local function DisableEnhancedLighting()
+
+    LightingEnhanced =
+        false
+
+
+    Lighting.GlobalShadows =
+        OriginalLighting.GlobalShadows
+
+
+    Lighting.EnvironmentDiffuseScale =
+        OriginalLighting.EnvironmentDiffuseScale
+
+
+    Lighting.EnvironmentSpecularScale =
+        OriginalLighting.EnvironmentSpecularScale
+
+
+    Lighting.Brightness =
+        OriginalLighting.Brightness
+
+
+    Lighting.ExposureCompensation =
+        OriginalLighting.ExposureCompensation
+
+
+    Notify(
+        "Lighting",
+        "Исходные настройки восстановлены"
+    )
+
+end
+
+
+---------------------------------------------------------------
+-- CINEMATIC MODE
+---------------------------------------------------------------
+
+local function SetCinematic(
+    enabled
+)
+
+    ShaderState.Cinematic =
+        enabled
+
+
+    if enabled then
+
+        EnableBloom()
+
+        EnableColorCorrection()
+
+        EnableSunRays()
+
+        EnableDepthOfField()
+
+        EnableEnhancedLighting()
+
+
+        Notify(
+            "Cinematic",
+            "Визуальный пресет включён"
+        )
+
+    else
+
+        DisableBloom()
+
+        DisableColorCorrection()
+
+        DisableSunRays()
+
+        DisableDepthOfField()
+
+        DisableEnhancedLighting()
+
+
+        Notify(
+            "Cinematic",
+            "Визуальный пресет выключен"
+        )
+
+    end
+
+end
+
+
+---------------------------------------------------------------
+-- RESTORE VISUALS
+---------------------------------------------------------------
+
+local function RestoreVisuals()
+
+    DisableBloom()
+
+    DisableColorCorrection()
+
+    DisableSunRays()
+
+    DisableDepthOfField()
+
+
+    ShaderState.Cinematic =
+        false
+
+
+    LightingEnhanced =
+        false
+
+
+    Lighting.Brightness =
+        OriginalLighting.Brightness
+
+    Lighting.ClockTime =
+        OriginalLighting.ClockTime
+
+    Lighting.FogEnd =
+        OriginalLighting.FogEnd
+
+    Lighting.GlobalShadows =
+        OriginalLighting.GlobalShadows
+
+    Lighting.ExposureCompensation =
+        OriginalLighting.ExposureCompensation
+
+    Lighting.EnvironmentDiffuseScale =
+        OriginalLighting.EnvironmentDiffuseScale
+
+    Lighting.EnvironmentSpecularScale =
+        OriginalLighting.EnvironmentSpecularScale
+
+
+    Camera.FieldOfView =
+        OriginalFOV
+
+
+    Notify(
+        "Visuals",
+        "Исходные визуальные параметры восстановлены"
+    )
+
+end
+
+
+---------------------------------------------------------------
+-- ANIMATION
+---------------------------------------------------------------
+
+local function StopAnimation()
+
+    if State.CurrentAnimation then
+
+        pcall(
+            function()
+
+                State.CurrentAnimation:Stop(
+                    0.15
+                )
+
+            end
+        )
+
+    end
+
+
+    State.CurrentAnimation =
+        nil
+
+
+    if State.CurrentAnimationObject then
+
+        State.CurrentAnimationObject:
+            Destroy()
+
+        State.CurrentAnimationObject =
+            nil
+
+    end
+
+end
+
+
+local function PlayAnimation(
+    animationId
+)
+
+    local id =
+        tonumber(
+            tostring(
+                animationId or ""
+            ):gsub(
+                "%s+",
+                ""
+            )
+        )
+
+
+    if not id then
+
+        Notify(
+            "Animation",
+            "Введите корректный ID"
+        )
+
+        return
+
+    end
+
+
+    local _, hum =
+        GetCharacter()
+
+
+    if not hum then
+        return
+    end
+
+
+    local animator =
+        hum:FindFirstChildOfClass(
+            "Animator"
+        )
+
+
+    if not animator then
+
+        animator =
+            Instance.new(
+                "Animator"
+            )
+
+        animator.Parent =
+            hum
+
+    end
+
+
+    StopAnimation()
+
+
+    local animation =
+        Instance.new(
+            "Animation"
+        )
+
+
+    animation.Name =
+        "UltraGptCustomAnimation"
+
+
+    animation.AnimationId =
+        "rbxassetid://"
+        ..
+        tostring(id)
+
+
+    local success, track =
+        pcall(
+            function()
+
+                return animator:
+                    LoadAnimation(
+                        animation
+                    )
+
+            end
+        )
+
+
+    if not success
+        or not track then
+
+        animation:Destroy()
+
+
+        Notify(
+            "Animation",
+            "Не удалось загрузить анимацию"
+        )
+
+
+        return
+
+    end
+
+
+    track.Priority =
+        Enum.AnimationPriority.Action
+
+
+    track.Looped =
+        false
+
+
+    track:Play(
+        0.15,
+        1,
+        1
+    )
+
+
+    State.AnimationId =
+        id
+
+    State.CurrentAnimation =
+        track
+
+    State.CurrentAnimationObject =
+        animation
+
+
+    Notify(
+        "Animation",
+        "Запущено: "
+        .. tostring(id)
+    )
+
+end
+
+
+local function ReplayAnimation()
+
+    if State.CurrentAnimation then
+
+        pcall(
+            function()
+
+                State.CurrentAnimation:
+                    Stop(
+                        0
+                    )
+
+                State.CurrentAnimation:
+                    Play(
+                        0.1,
+                        1,
+                        1
+                    )
+
+            end
+        )
+
+
+        Notify(
+            "Animation",
+            "Replay"
+        )
+
+
+        return
+
+    end
+
+
+    if State.AnimationId then
+
+        PlayAnimation(
+            State.AnimationId
+        )
+
+    else
+
+        Notify(
+            "Animation",
+            "Сначала введи ID"
+        )
+
+    end
 
 end
 
@@ -4509,6 +5229,7 @@ do
             State.InfiniteJump =
                 not State.InfiniteJump
 
+
             Notify(
                 "Infinite Jump",
                 State.InfiniteJump
@@ -4529,6 +5250,7 @@ do
             State.SuperJump =
                 not State.SuperJump
 
+
             Notify(
                 "Super Jump",
                 State.SuperJump
@@ -4548,6 +5270,7 @@ do
 
             State.GodMode =
                 not State.GodMode
+
 
             Notify(
                 "God Mode",
@@ -4589,6 +5312,7 @@ do
             local _, hum =
                 GetCharacter()
 
+
             if hum then
                 hum.Sit = true
             end
@@ -4605,6 +5329,7 @@ do
 
             local _, hum =
                 GetCharacter()
+
 
             if hum then
                 hum.Health = 0
@@ -4662,14 +5387,6 @@ do
                 hum.WalkSpeed =
                     number
 
-
-                Notify(
-                    "WalkSpeed",
-                    tostring(
-                        number
-                    )
-                )
-
             end
 
         end
@@ -4706,14 +5423,6 @@ do
                 hum.JumpPower =
                     number
 
-
-                Notify(
-                    "JumpPower",
-                    tostring(
-                        number
-                    )
-                )
-
             end
 
         end
@@ -4738,14 +5447,6 @@ do
 
                 State.FlySpeed =
                     number
-
-
-                Notify(
-                    "Fly Speed",
-                    tostring(
-                        number
-                    )
-                )
 
             end
 
@@ -4837,12 +5538,9 @@ do
     )
 
 
-    -----------------------------------------------------------
-    -- DROPDOWN
-    -----------------------------------------------------------
-
     local dropdown =
         Instance.new("TextButton")
+
 
     dropdown.Size =
         UDim2.new(
@@ -4852,26 +5550,34 @@ do
             46
         )
 
+
     dropdown.BackgroundColor3 =
         C.CARD
+
 
     dropdown.Text =
         "  Select player..."
 
+
     dropdown.TextColor3 =
         C.WHITE
+
 
     dropdown.TextXAlignment =
         Enum.TextXAlignment.Left
 
+
     dropdown.Font =
         Enum.Font.GothamMedium
+
 
     dropdown.TextSize =
         10
 
+
     dropdown.AutoButtonColor =
         false
+
 
     dropdown.Parent =
         container
@@ -4880,11 +5586,13 @@ do
     local dropdownCorner =
         Instance.new("UICorner")
 
+
     dropdownCorner.CornerRadius =
         UDim.new(
             0,
             9
         )
+
 
     dropdownCorner.Parent =
         dropdown
@@ -4893,14 +5601,17 @@ do
     local arrow =
         Instance.new("TextLabel")
 
+
     arrow.BackgroundTransparency =
         1
+
 
     arrow.AnchorPoint =
         Vector2.new(
             1,
             0.5
         )
+
 
     arrow.Position =
         UDim2.new(
@@ -4910,6 +5621,7 @@ do
             0
         )
 
+
     arrow.Size =
         UDim2.new(
             0,
@@ -4918,17 +5630,22 @@ do
             20
         )
 
+
     arrow.Text =
         "▼"
+
 
     arrow.TextColor3 =
         C.GRAY
 
+
     arrow.Font =
         Enum.Font.GothamBold
 
+
     arrow.TextSize =
         9
+
 
     arrow.Parent =
         dropdown
@@ -4941,6 +5658,7 @@ do
     local dropdownList =
         Instance.new("Frame")
 
+
     dropdownList.Size =
         UDim2.new(
             1,
@@ -4949,17 +5667,22 @@ do
             190
         )
 
+
     dropdownList.BackgroundColor3 =
         C.BLACK3
+
 
     dropdownList.BorderSizePixel =
         0
 
+
     dropdownList.Visible =
         false
 
+
     dropdownList.ZIndex =
         30
+
 
     dropdownList.Parent =
         container
@@ -4968,11 +5691,13 @@ do
     local listCorner =
         Instance.new("UICorner")
 
+
     listCorner.CornerRadius =
         UDim.new(
             0,
             10
         )
+
 
     listCorner.Parent =
         dropdownList
@@ -4980,6 +5705,7 @@ do
 
     local playerScroll =
         Instance.new("ScrollingFrame")
+
 
     playerScroll.Size =
         UDim2.new(
@@ -4989,20 +5715,26 @@ do
             0
         )
 
+
     playerScroll.BackgroundTransparency =
         1
+
 
     playerScroll.BorderSizePixel =
         0
 
+
     playerScroll.ScrollBarThickness =
         3
+
 
     playerScroll.ScrollBarImageColor3 =
         C.WHITE
 
+
     playerScroll.AutomaticCanvasSize =
         Enum.AutomaticSize.Y
+
 
     playerScroll.CanvasSize =
         UDim2.new(
@@ -5012,8 +5744,10 @@ do
             0
         )
 
+
     playerScroll.ZIndex =
         31
+
 
     playerScroll.Parent =
         dropdownList
@@ -5022,11 +5756,13 @@ do
     local playerLayout =
         Instance.new("UIListLayout")
 
+
     playerLayout.Padding =
         UDim.new(
             0,
             4
         )
+
 
     playerLayout.Parent =
         playerScroll
@@ -5035,11 +5771,13 @@ do
     local playerPadding =
         Instance.new("UIPadding")
 
+
     playerPadding.PaddingTop =
         UDim.new(
             0,
             7
         )
+
 
     playerPadding.PaddingBottom =
         UDim.new(
@@ -5047,17 +5785,20 @@ do
             7
         )
 
+
     playerPadding.PaddingLeft =
         UDim.new(
             0,
             7
         )
 
+
     playerPadding.PaddingRight =
         UDim.new(
             0,
             7
         )
+
 
     playerPadding.Parent =
         playerScroll
@@ -5070,7 +5811,9 @@ do
         ) do
 
             if child:IsA("TextButton") then
+
                 child:Destroy()
+
             end
 
         end
@@ -5083,7 +5826,10 @@ do
             if player ~= LocalPlayer then
 
                 local button =
-                    Instance.new("TextButton")
+                    Instance.new(
+                        "TextButton"
+                    )
+
 
                 button.Size =
                     UDim2.new(
@@ -5093,8 +5839,10 @@ do
                         34
                     )
 
+
                 button.BackgroundColor3 =
                     C.CARD
+
 
                 button.Text =
                     "  "
@@ -5102,38 +5850,49 @@ do
                     .. "  @"
                     .. player.Name
 
+
                 button.TextColor3 =
                     C.WHITE
+
 
                 button.TextXAlignment =
                     Enum.TextXAlignment.Left
 
+
                 button.Font =
                     Enum.Font.GothamMedium
+
 
                 button.TextSize =
                     10
 
+
                 button.AutoButtonColor =
                     false
 
+
                 button.ZIndex =
                     32
+
 
                 button.Parent =
                     playerScroll
 
 
-                local corner =
-                    Instance.new("UICorner")
+                local c =
+                    Instance.new(
+                        "UICorner"
+                    )
 
-                corner.CornerRadius =
+
+                c.CornerRadius =
                     UDim.new(
                         0,
                         7
                     )
 
-                corner.Parent =
+
+                c.Parent =
                     button
 
 
@@ -5256,10 +6015,8 @@ do
 
 
             if number then
-
                 State.OrbitRadius =
                     number
-
             end
 
         end
@@ -5281,10 +6038,8 @@ do
 
 
             if number then
-
                 State.OrbitHeight =
                     number
-
             end
 
         end
@@ -5306,10 +6061,8 @@ do
 
 
             if number then
-
                 State.OrbitSpeed =
                     number
-
             end
 
         end
@@ -5468,6 +6221,7 @@ do
             State.Spin =
                 not State.Spin
 
+
             Notify(
                 "Spin",
                 State.Spin
@@ -5488,6 +6242,7 @@ do
             State.RandomSpin =
                 not State.RandomSpin
 
+
             Notify(
                 "Random Spin",
                 State.RandomSpin
@@ -5507,6 +6262,7 @@ do
 
             State.Tornado =
                 not State.Tornado
+
 
             Notify(
                 "Tornado",
@@ -5836,12 +6592,6 @@ do
             Camera.FieldOfView =
                 OriginalFOV
 
-
-            Notify(
-                "FOV",
-                "Исходное значение восстановлено"
-            )
-
         end,
         false
     )
@@ -6016,6 +6766,641 @@ end
 
 
 ---------------------------------------------------------------
+-- ANIMATIONS PAGE
+---------------------------------------------------------------
+
+do
+
+    local container =
+        CreateContainer(
+            Pages.Animations
+        )
+
+
+    Section(
+        container,
+        "CUSTOM ANIMATION"
+    )
+
+
+    local animationInput =
+        Input(
+            container,
+            "Animation ID",
+            "",
+            function(value)
+
+                local id =
+                    tostring(
+                        value or ""
+                    ):gsub(
+                        "%s+",
+                        ""
+                    )
+
+
+                local number =
+                    tonumber(id)
+
+
+                if number then
+
+                    State.AnimationId =
+                        number
+
+
+                    Notify(
+                        "Animation",
+                        "ID сохранён: "
+                        .. tostring(
+                            number
+                        )
+                    )
+
+                else
+
+                    State.AnimationId =
+                        nil
+
+
+                    if id ~= "" then
+
+                        Notify(
+                            "Animation",
+                            "ID должен содержать цифры"
+                        )
+
+                    end
+
+                end
+
+            end
+        )
+
+
+    Section(
+        container,
+        "CONTROLS"
+    )
+
+
+    Button(
+        container,
+        "Play Animation",
+        function()
+
+            local id =
+                State.AnimationId
+
+
+            if not id then
+
+                id =
+                    tonumber(
+                        tostring(
+                            animationInput.Text
+                        ):gsub(
+                            "%s+",
+                            ""
+                        )
+                    )
+
+            end
+
+
+            if not id then
+
+                Notify(
+                    "Animation",
+                    "Сначала введи ID"
+                )
+
+
+                return
+
+            end
+
+
+            PlayAnimation(
+                id
+            )
+
+        end,
+        false
+    )
+
+
+    Button(
+        container,
+        "Stop Animation",
+        function()
+
+            StopAnimation()
+
+
+            Notify(
+                "Animation",
+                "Остановлена"
+            )
+
+        end,
+        false
+    )
+
+
+    Button(
+        container,
+        "Replay Animation",
+        function()
+
+            ReplayAnimation()
+
+        end,
+        false
+    )
+
+
+    Section(
+        container,
+        "INFO"
+    )
+
+
+    local animationInfo =
+        Instance.new("TextLabel")
+
+
+    animationInfo.Size =
+        UDim2.new(
+            1,
+            0,
+            0,
+            100
+        )
+
+
+    animationInfo.BackgroundColor3 =
+        C.CARD
+
+
+    animationInfo.BorderSizePixel =
+        0
+
+
+    animationInfo.Text =
+        "Вводи ID в формате:\n"
+        .. "1234567890\n\n"
+        .. "Скрипт автоматически добавит:\n"
+        .. "rbxassetid://"
+
+
+    animationInfo.TextColor3 =
+        C.GRAY
+
+
+    animationInfo.Font =
+        Enum.Font.Gotham
+
+
+    animationInfo.TextSize =
+        10
+
+
+    animationInfo.TextWrapped =
+        true
+
+
+    animationInfo.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+
+    animationInfo.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+
+    animationInfo.Parent =
+        container
+
+
+    local animationInfoCorner =
+        Instance.new("UICorner")
+
+
+    animationInfoCorner.CornerRadius =
+        UDim.new(
+            0,
+            9
+        )
+
+
+    animationInfoCorner.Parent =
+        animationInfo
+
+end
+
+
+---------------------------------------------------------------
+-- SHADERS PAGE
+---------------------------------------------------------------
+
+do
+
+    local container =
+        CreateContainer(
+            Pages.Shaders
+        )
+
+
+    Section(
+        container,
+        "POST PROCESSING"
+    )
+
+
+    Button(
+        container,
+        "Bloom",
+        function()
+
+            ShaderState.Bloom =
+                not ShaderState.Bloom
+
+
+            if ShaderState.Bloom then
+
+                EnableBloom()
+
+            else
+
+                DisableBloom()
+
+            end
+
+        end,
+        true
+    )
+
+
+    Button(
+        container,
+        "Color Correction",
+        function()
+
+            ShaderState.ColorCorrection =
+                not ShaderState.ColorCorrection
+
+
+            if ShaderState.ColorCorrection then
+
+                EnableColorCorrection()
+
+            else
+
+                DisableColorCorrection()
+
+            end
+
+        end,
+        true
+    )
+
+
+    Button(
+        container,
+        "Sun Rays",
+        function()
+
+            ShaderState.SunRays =
+                not ShaderState.SunRays
+
+
+            if ShaderState.SunRays then
+
+                EnableSunRays()
+
+            else
+
+                DisableSunRays()
+
+            end
+
+        end,
+        true
+    )
+
+
+    Button(
+        container,
+        "Depth Of Field",
+        function()
+
+            ShaderState.DepthOfField =
+                not ShaderState.DepthOfField
+
+
+            if ShaderState.DepthOfField then
+
+                EnableDepthOfField()
+
+            else
+
+                DisableDepthOfField()
+
+            end
+
+        end,
+        true
+    )
+
+
+    Section(
+        container,
+        "LIGHTING"
+    )
+
+
+    Button(
+        container,
+        "Enhanced Lighting",
+        function()
+
+            if LightingEnhanced then
+
+                DisableEnhancedLighting()
+
+            else
+
+                EnableEnhancedLighting()
+
+            end
+
+        end,
+        false
+    )
+
+
+    Button(
+        container,
+        "Cinematic",
+        function()
+
+            SetCinematic(
+                not ShaderState.Cinematic
+            )
+
+        end,
+        false
+    )
+
+
+    Section(
+        container,
+        "PRESETS"
+    )
+
+
+    Button(
+        container,
+        "Soft Cinematic",
+        function()
+
+            DisableBloom()
+            DisableSunRays()
+            DisableDepthOfField()
+
+
+            EnableColorCorrection()
+
+
+            local effect =
+                ShaderEffects.ColorCorrection
+
+
+            if effect then
+
+                effect.Brightness =
+                    0.02
+
+                effect.Contrast =
+                    0.08
+
+                effect.Saturation =
+                    0.05
+
+            end
+
+
+            EnableEnhancedLighting()
+
+
+            Notify(
+                "Shaders",
+                "Soft Cinematic"
+            )
+
+        end,
+        false
+    )
+
+
+    Button(
+        container,
+        "Bright Cinematic",
+        function()
+
+            EnableBloom()
+            EnableSunRays()
+            EnableColorCorrection()
+
+
+            local bloom =
+                ShaderEffects.Bloom
+
+
+            if bloom then
+
+                bloom.Intensity =
+                    0.22
+
+                bloom.Size =
+                    20
+
+            end
+
+
+            local correction =
+                ShaderEffects.ColorCorrection
+
+
+            if correction then
+
+                correction.Brightness =
+                    0.08
+
+                correction.Contrast =
+                    0.12
+
+                correction.Saturation =
+                    0.1
+
+            end
+
+
+            EnableEnhancedLighting()
+
+
+            Notify(
+                "Shaders",
+                "Bright Cinematic"
+            )
+
+        end,
+        false
+    )
+
+
+    Button(
+        container,
+        "Cinematic Focus",
+        function()
+
+            EnableBloom()
+
+            EnableColorCorrection()
+
+            EnableSunRays()
+
+            EnableDepthOfField()
+
+            EnableEnhancedLighting()
+
+
+            local dof =
+                ShaderEffects.DepthOfField
+
+
+            if dof then
+
+                dof.FocusDistance =
+                    25
+
+                dof.InFocusRadius =
+                    12
+
+                dof.NearIntensity =
+                    0.06
+
+                dof.FarIntensity =
+                    0.15
+
+            end
+
+
+            Notify(
+                "Shaders",
+                "Cinematic Focus"
+            )
+
+        end,
+        false
+    )
+
+
+    Section(
+        container,
+        "RESET"
+    )
+
+
+    Button(
+        container,
+        "Restore Visuals",
+        function()
+
+            RestoreVisuals()
+
+        end,
+        false
+    )
+
+
+    local shaderInfo =
+        Instance.new("TextLabel")
+
+
+    shaderInfo.Size =
+        UDim2.new(
+            1,
+            0,
+            0,
+            110
+        )
+
+
+    shaderInfo.BackgroundColor3 =
+        C.CARD
+
+
+    shaderInfo.BorderSizePixel =
+        0
+
+
+    shaderInfo.Text =
+        "Shaders работают через локальные\n"
+        .. "пост-эффекты Roblox:\n\n"
+        .. "• Bloom\n"
+        .. "• Color Correction\n"
+        .. "• Sun Rays\n"
+        .. "• Depth Of Field\n\n"
+        .. "Это улучшает картинку без текстурного мусора."
+
+
+    shaderInfo.TextColor3 =
+        C.GRAY
+
+
+    shaderInfo.Font =
+        Enum.Font.Gotham
+
+
+    shaderInfo.TextSize =
+        10
+
+
+    shaderInfo.TextWrapped =
+        true
+
+
+    shaderInfo.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+
+    shaderInfo.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+
+    shaderInfo.Parent =
+        container
+
+
+    local shaderCorner =
+        Instance.new("UICorner")
+
+
+    shaderCorner.CornerRadius =
+        UDim.new(
+            0,
+            9
+        )
+
+
+    shaderCorner.Parent =
+        shaderInfo
+
+end
+
+
+---------------------------------------------------------------
 -- SETTINGS PAGE
 ---------------------------------------------------------------
 
@@ -6184,47 +7569,58 @@ do
     local info =
         Instance.new("TextLabel")
 
+
     info.Size =
         UDim2.new(
             1,
             0,
             0,
-            120
+            140
         )
+
 
     info.BackgroundColor3 =
         C.CARD
 
+
     info.BorderSizePixel =
         0
+
 
     info.Text =
         "INSERT\n"
         .. "Открыть / закрыть меню\n\n"
+        .. "R\n"
+        .. "Launch\n\n"
         .. "W A S D\n"
-        .. "Управление Fly\n\n"
+        .. "Fly\n\n"
         .. "SPACE / LEFT CTRL\n"
-        .. "Вверх / вниз в Fly\n\n"
-        .. "Player Orbit / Follow\n"
-        .. "Сначала выбери игрока"
+        .. "Вверх / вниз в Fly"
+
 
     info.TextColor3 =
         C.GRAY
 
+
     info.Font =
         Enum.Font.Gotham
+
 
     info.TextSize =
         10
 
+
     info.TextWrapped =
         true
+
 
     info.TextXAlignment =
         Enum.TextXAlignment.Left
 
+
     info.TextYAlignment =
         Enum.TextYAlignment.Center
+
 
     info.Parent =
         container
@@ -6233,11 +7629,13 @@ do
     local infoCorner =
         Instance.new("UICorner")
 
+
     infoCorner.CornerRadius =
         UDim.new(
             0,
             9
         )
+
 
     infoCorner.Parent =
         info
@@ -6246,7 +7644,7 @@ end
 
 
 ---------------------------------------------------------------
--- TAB SWITCHING
+-- TAB SWITCH
 ---------------------------------------------------------------
 
 local function SwitchTab(
@@ -6314,11 +7712,13 @@ end
 local SearchWindow =
     Instance.new("Frame")
 
+
 SearchWindow.AnchorPoint =
     Vector2.new(
         0.5,
         0.5
     )
+
 
 SearchWindow.Position =
     UDim2.new(
@@ -6328,6 +7728,7 @@ SearchWindow.Position =
         0
     )
 
+
 SearchWindow.Size =
     UDim2.new(
         0,
@@ -6336,17 +7737,22 @@ SearchWindow.Size =
         410
     )
 
+
 SearchWindow.BackgroundColor3 =
     C.CARD
+
 
 SearchWindow.BorderSizePixel =
     0
 
+
 SearchWindow.Visible =
     false
 
+
 SearchWindow.ZIndex =
     50
+
 
 SearchWindow.Parent =
     ScreenGui
@@ -6355,11 +7761,13 @@ SearchWindow.Parent =
 local SearchCorner =
     Instance.new("UICorner")
 
+
 SearchCorner.CornerRadius =
     UDim.new(
         0,
         12
     )
+
 
 SearchCorner.Parent =
     SearchWindow
@@ -6367,6 +7775,7 @@ SearchCorner.Parent =
 
 local SearchTitle =
     Instance.new("TextLabel")
+
 
 SearchTitle.Position =
     UDim2.new(
@@ -6376,6 +7785,7 @@ SearchTitle.Position =
         10
     )
 
+
 SearchTitle.Size =
     UDim2.new(
         1,
@@ -6384,26 +7794,34 @@ SearchTitle.Size =
         24
     )
 
+
 SearchTitle.BackgroundTransparency =
     1
+
 
 SearchTitle.Text =
     "FUNCTION SEARCH"
 
+
 SearchTitle.TextColor3 =
     C.WHITE
+
 
 SearchTitle.Font =
     Enum.Font.GothamBold
 
+
 SearchTitle.TextSize =
     13
+
 
 SearchTitle.TextXAlignment =
     Enum.TextXAlignment.Left
 
+
 SearchTitle.ZIndex =
     51
+
 
 SearchTitle.Parent =
     SearchWindow
@@ -6411,6 +7829,7 @@ SearchTitle.Parent =
 
 local SearchBox =
     Instance.new("TextBox")
+
 
 SearchBox.Position =
     UDim2.new(
@@ -6420,6 +7839,7 @@ SearchBox.Position =
         45
     )
 
+
 SearchBox.Size =
     UDim2.new(
         1,
@@ -6428,35 +7848,46 @@ SearchBox.Size =
         38
     )
 
+
 SearchBox.BackgroundColor3 =
     C.BLACK2
+
 
 SearchBox.BorderSizePixel =
     0
 
+
 SearchBox.Text =
     ""
+
 
 SearchBox.PlaceholderText =
     "Название функции..."
 
+
 SearchBox.TextColor3 =
     C.WHITE
+
 
 SearchBox.PlaceholderColor3 =
     C.GRAY
 
+
 SearchBox.Font =
     Enum.Font.Gotham
+
 
 SearchBox.TextSize =
     10
 
+
 SearchBox.ClearTextOnFocus =
     false
 
+
 SearchBox.ZIndex =
     51
+
 
 SearchBox.Parent =
     SearchWindow
@@ -6465,11 +7896,13 @@ SearchBox.Parent =
 local SearchBoxCorner =
     Instance.new("UICorner")
 
+
 SearchBoxCorner.CornerRadius =
     UDim.new(
         0,
         8
     )
+
 
 SearchBoxCorner.Parent =
     SearchBox
@@ -6477,6 +7910,7 @@ SearchBoxCorner.Parent =
 
 local Results =
     Instance.new("ScrollingFrame")
+
 
 Results.Position =
     UDim2.new(
@@ -6486,6 +7920,7 @@ Results.Position =
         92
     )
 
+
 Results.Size =
     UDim2.new(
         1,
@@ -6494,23 +7929,30 @@ Results.Size =
         -104
     )
 
+
 Results.BackgroundTransparency =
     1
+
 
 Results.BorderSizePixel =
     0
 
+
 Results.ScrollBarThickness =
     3
+
 
 Results.ScrollBarImageColor3 =
     C.WHITE
 
+
 Results.AutomaticCanvasSize =
     Enum.AutomaticSize.Y
 
+
 Results.ZIndex =
     51
+
 
 Results.Parent =
     SearchWindow
@@ -6519,11 +7961,13 @@ Results.Parent =
 local ResultLayout =
     Instance.new("UIListLayout")
 
+
 ResultLayout.Padding =
     UDim.new(
         0,
         5
     )
+
 
 ResultLayout.Parent =
     Results
@@ -6549,10 +7993,6 @@ local SearchFunctions = {
     "Random Spin",
     "Tornado",
     "Orbit",
-    "Flip",
-    "Launch",
-    "Random Launch",
-    "YEET",
 
     "Player Orbit",
     "Follow Player",
@@ -6567,10 +8007,28 @@ local SearchFunctions = {
     "FullBright",
     "Rainbow",
 
+    "Launch",
+    "Random Launch",
+    "YEET",
+    "Flip",
+
     "FOV",
     "Gravity",
     "Low Gravity",
     "Restore Gravity",
+
+    "Play Animation",
+    "Stop Animation",
+    "Replay Animation",
+
+    "Bloom",
+    "Color Correction",
+    "Sun Rays",
+    "Depth Of Field",
+    "Cinematic",
+    "Enhanced Lighting",
+    "Restore Visuals",
+
     "Day",
     "Night"
 }
@@ -6688,26 +8146,6 @@ local function RunSearchFunction(
         )
 
 
-    elseif name == "Flip" then
-
-        Flip()
-
-
-    elseif name == "Launch" then
-
-        Launch()
-
-
-    elseif name == "Random Launch" then
-
-        RandomLaunch()
-
-
-    elseif name == "YEET" then
-
-        Yeet()
-
-
     elseif name == "Player Orbit" then
 
         SetPlayerOrbit(
@@ -6772,6 +8210,26 @@ local function RunSearchFunction(
         )
 
 
+    elseif name == "Launch" then
+
+        Launch()
+
+
+    elseif name == "Random Launch" then
+
+        RandomLaunch()
+
+
+    elseif name == "YEET" then
+
+        Yeet()
+
+
+    elseif name == "Flip" then
+
+        Flip()
+
+
     elseif name == "FOV" then
 
         Camera.FieldOfView =
@@ -6791,6 +8249,107 @@ local function RunSearchFunction(
     elseif name == "Restore Gravity" then
 
         RestoreGravity()
+
+
+    elseif name == "Play Animation" then
+
+        if State.AnimationId then
+
+            PlayAnimation(
+                State.AnimationId
+            )
+
+        else
+
+            Notify(
+                "Animation",
+                "Сначала введи ID"
+            )
+
+        end
+
+
+    elseif name == "Stop Animation" then
+
+        StopAnimation()
+
+
+    elseif name == "Replay Animation" then
+
+        ReplayAnimation()
+
+
+    elseif name == "Bloom" then
+
+        ShaderState.Bloom =
+            not ShaderState.Bloom
+
+
+        if ShaderState.Bloom then
+            EnableBloom()
+        else
+            DisableBloom()
+        end
+
+
+    elseif name == "Color Correction" then
+
+        ShaderState.ColorCorrection =
+            not ShaderState.ColorCorrection
+
+
+        if ShaderState.ColorCorrection then
+            EnableColorCorrection()
+        else
+            DisableColorCorrection()
+        end
+
+
+    elseif name == "Sun Rays" then
+
+        ShaderState.SunRays =
+            not ShaderState.SunRays
+
+
+        if ShaderState.SunRays then
+            EnableSunRays()
+        else
+            DisableSunRays()
+        end
+
+
+    elseif name == "Depth Of Field" then
+
+        ShaderState.DepthOfField =
+            not ShaderState.DepthOfField
+
+
+        if ShaderState.DepthOfField then
+            EnableDepthOfField()
+        else
+            DisableDepthOfField()
+        end
+
+
+    elseif name == "Cinematic" then
+
+        SetCinematic(
+            not ShaderState.Cinematic
+        )
+
+
+    elseif name == "Enhanced Lighting" then
+
+        if LightingEnhanced then
+            DisableEnhancedLighting()
+        else
+            EnableEnhancedLighting()
+        end
+
+
+    elseif name == "Restore Visuals" then
+
+        RestoreVisuals()
 
 
     elseif name == "Day" then
@@ -6822,9 +8381,7 @@ local function RebuildSearch()
     ) do
 
         if child:IsA("TextButton") then
-
             child:Destroy()
-
         end
 
     end
@@ -6842,7 +8399,9 @@ local function RebuildSearch()
 
         if query == ""
             or string.find(
-                string.lower(name),
+                string.lower(
+                    name
+                ),
                 query,
                 1,
                 true
@@ -6850,7 +8409,9 @@ local function RebuildSearch()
 
 
             local button =
-                Instance.new("TextButton")
+                Instance.new(
+                    "TextButton"
+                )
 
 
             button.Size =
@@ -6895,7 +8456,9 @@ local function RebuildSearch()
 
 
             local corner =
-                Instance.new("UICorner")
+                Instance.new(
+                    "UICorner"
+                )
 
 
             corner.CornerRadius =
@@ -6953,7 +8516,7 @@ SearchButton.MouseButton1Click:Connect(
 
 
 ---------------------------------------------------------------
--- INSERT
+-- HOTKEYS
 ---------------------------------------------------------------
 
 UserInputService.InputBegan:Connect(
@@ -6966,6 +8529,10 @@ UserInputService.InputBegan:Connect(
             return
         end
 
+
+        -------------------------------------------------------
+        -- INSERT = MENU
+        -------------------------------------------------------
 
         if input.KeyCode ==
             Enum.KeyCode.Insert then
@@ -6986,6 +8553,18 @@ UserInputService.InputBegan:Connect(
                 )
 
             end
+
+        end
+
+
+        -------------------------------------------------------
+        -- R = LAUNCH
+        -------------------------------------------------------
+
+        if input.KeyCode ==
+            Enum.KeyCode.R then
+
+            Launch()
 
         end
 
@@ -7082,7 +8661,7 @@ Players.PlayerRemoving:Connect(
 
 
 ---------------------------------------------------------------
--- XRAY NEW OBJECTS
+-- XRAY LIVE UPDATE
 ---------------------------------------------------------------
 
 Workspace.DescendantAdded:Connect(
@@ -7121,10 +8700,6 @@ LocalPlayer.CharacterAdded:Connect(
         RefreshCharacter()
 
 
-        -------------------------------------------------------
-        -- MOVEMENT
-        -------------------------------------------------------
-
         if Humanoid then
 
             Humanoid.WalkSpeed =
@@ -7139,20 +8714,12 @@ LocalPlayer.CharacterAdded:Connect(
         end
 
 
-        -------------------------------------------------------
-        -- NOCLIP
-        -------------------------------------------------------
-
         if State.NoClip then
 
             SaveNoClipValues()
 
         end
 
-
-        -------------------------------------------------------
-        -- GHOST
-        -------------------------------------------------------
 
         if State.Ghost then
 
@@ -7163,10 +8730,6 @@ LocalPlayer.CharacterAdded:Connect(
         end
 
 
-        -------------------------------------------------------
-        -- ICE
-        -------------------------------------------------------
-
         if State.Ice then
 
             SetIce(
@@ -7175,10 +8738,6 @@ LocalPlayer.CharacterAdded:Connect(
 
         end
 
-
-        -------------------------------------------------------
-        -- SPACE
-        -------------------------------------------------------
 
         if State.Space then
 
@@ -7196,10 +8755,6 @@ LocalPlayer.CharacterAdded:Connect(
         end
 
 
-        -------------------------------------------------------
-        -- FLY
-        -------------------------------------------------------
-
         if State.Fly then
 
             StopFly()
@@ -7209,10 +8764,6 @@ LocalPlayer.CharacterAdded:Connect(
         end
 
 
-        -------------------------------------------------------
-        -- FLOAT
-        -------------------------------------------------------
-
         if State.Float then
 
             SetFloat(
@@ -7221,10 +8772,6 @@ LocalPlayer.CharacterAdded:Connect(
 
         end
 
-
-        -------------------------------------------------------
-        -- ESP
-        -------------------------------------------------------
 
         if State.ESP then
 
@@ -7240,10 +8787,6 @@ LocalPlayer.CharacterAdded:Connect(
 
         end
 
-
-        -------------------------------------------------------
-        -- RAINBOW
-        -------------------------------------------------------
 
         if State.Rainbow then
 
@@ -7354,7 +8897,36 @@ RunService.Heartbeat:Connect(
 
 
 ---------------------------------------------------------------
--- INITIALIZATION
+-- GOD MODE UPDATE
+---------------------------------------------------------------
+
+RunService.Heartbeat:Connect(
+    function()
+
+        if not State.GodMode then
+            return
+        end
+
+
+        local _, hum =
+            GetCharacter()
+
+
+        if hum
+            and hum.Health <
+            hum.MaxHealth then
+
+            hum.Health =
+                hum.MaxHealth
+
+        end
+
+    end
+)
+
+
+---------------------------------------------------------------
+-- INITIAL CHARACTER SETTINGS
 ---------------------------------------------------------------
 
 do
@@ -7445,7 +9017,7 @@ task.delay(
     function()
 
         Notify(
-            "UltraGpt v9",
+            "UltraGpt v10",
             "Loaded • Compact Mode"
         )
 
@@ -7454,5 +9026,5 @@ task.delay(
 
 
 --==============================================================
---                         END OF V9
+--                         END OF V10
 --==============================================================
